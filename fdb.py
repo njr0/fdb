@@ -8,6 +8,17 @@
 #
 # 2008/08/20 v0.1       Initial version.   6 tests pass
 #                       Used to import 1456 objects from delicious sucessfully
+# 2008/08/20 v0.2       Added some path tests and new tag_path_split method.
+#                       Added untag_object_by_id for removing a tag.
+#                       Made it so that 'absolute' paths for tags can be
+#                       used (e.g. '/njr/rating') to denote tags, as well
+#                       as relative paths (e.g. 'rating').
+#                       Subnamespaces still not recognized by tag/untag
+#                       but that should change soon.
+#                       Also, the tests should all actually work for people
+#                       whose FluidDB username isn't njr now :-)
+#                       10 tests pass now.
+# 
 #
 # Notes: 
 #
@@ -33,6 +44,8 @@
 # rating                                           --- the short tag name
 #
 
+__version__ = '0.2'
+
 import unittest, os, types, sys, httplib2, urllib
 import fluiddb
 if sys.version_info < (2, 6):
@@ -44,6 +57,7 @@ class ProblemReadingCredentialsFileError (Exception): pass
 class BadCredentialsError (Exception): pass
 class CredentialsFileNotFoundError (Exception): pass
 class NotHandledYetError (Exception): pass
+class TagPathError (Exception): pass
 
 class STATUS:
     OK = 200
@@ -56,6 +70,13 @@ FLUIDDB_PATH = 'http://fluidDB.fluidinfo.com'
 
 
 class O:
+    """This is really a dummy class that just sticks everything in
+       the hash (dictionary) that initializes it into self.dict
+       so that you can use o.id instead of hash['id'] etc.,
+       and to allow some string formatting etc.
+
+       Most objects returned natively as hashes by the FluidDB API
+       are mapped to these dummy objects in this library."""
     def __init__ (self, hash):
         for k in hash:
             self.__dict__[k] = hash[k]
@@ -156,17 +177,19 @@ class FluidDB:
            If the tag's name (tag) contains slashes, namespaces are created
            as needed.
 
+           Doesn't handle tags with subnamespaces yet.
+
            Returns (O) object corresponding to the tag if successful,
            otherwise an integer error code.
         """
-        parts = tag.split ('/')
-        if len (parts) > 1:
+        (user, subnamespace, tagname) = self.tag_path_split (tag)
+        if subnamespace:
             raise NotHandledYetError
-        namespace = '/tags/%s' % (self.credentials.username)
+        fullnamespace = '/tags/%s' % user
         hash = {'indexed' : indexed, 'description' : description or '',
                 'name' : tag}
         fields = json.dumps (hash)
-        (status, o) = self.call ('POST', namespace, fields)
+        (status, o) = self.call ('POST', fullnamespace, fields)
         return O(o) if status == STATUS.CREATED else status
 
     def delete_abstract_tag (self, tag):
@@ -197,6 +220,22 @@ class FluidDB:
         else:
             return 0 if status == STATUS.NO_CONTENT else status
 
+    def untag_object_by_id (self, id, tag, missingConstitutesSuccess=True):
+        """Removes the tag from the object with id if present.
+           If the tag, or the object, doesn't exist,
+           the default is that this is considered successful,
+           but missingConstitutesSuccess can be set to False
+           to override this behaviour.
+
+           Returns 0 for success, non-zero error code otherwise.
+        """
+        fullTag = self.abs_tag_path (tag)
+        objTag = '/objects/%s%s' % (id, fullTag)
+        (status, o) = self.call ('DELETE', objTag)
+        ok = (status == STATUS.NO_CONTENT
+                or status == STATUS.NOT_FOUND and missingConstitutesSuccess)
+        return 0 if ok else status
+
     def get_tag_value_by_id (self, id, tag):
         """Gets the value of a tag on an object identified by the
            object's ID.
@@ -225,7 +264,7 @@ class FluidDB:
            /tags is stripped off (which might be a problem if there's
            a user called tags...
 
-           EXAMPLES:
+           Examples: (assuming the user credentials username is njr):
                 abs_tag_path ('rating') = '/njr/rating'
                 abs_tag_path ('/njr/rating') = '/njr/rating'
                 abs_tag_path ('/tags/njr/rating') = '/njr/rating'
@@ -244,7 +283,8 @@ class FluidDB:
         
     def full_tag_path (self, tag):
         """Returns the absolute tag path (see above), prefixed with /tag.
-           Examples:
+
+           Examples: (assuming the user credentials username is njr):
                 full_tag_path ('rating') = '/tags/njr/rating'
                 full_tag_path ('/njr/rating') = '/tags/njr/rating'
                 full_tag_path ('/tags/njr/rating') = '/tags/njr/rating'
@@ -256,6 +296,45 @@ class FluidDB:
             return tag
         else:
             return '/tags%s' % self.abs_tag_path (tag)
+
+    def tag_path_split (self, tag):
+        """A bit like os.path.split, this splits any old kind of a FluidDB
+           tag path into a user, a subnamespace (if there is one) and a tag.
+           But unlike os.path.split, if no namespace is given,
+           the one from the user credentials is returned.
+
+           Any /tags/ prefix is discarded and the namespace is returned
+           with no leading '/'.
+
+           Examples: (assuming the user credentials username is njr):
+                tag_path_split ('rating') = ('njr', '', 'rating')
+                tag_path_split ('/njr/rating') = ('njr', '', 'rating')
+                tag_path_split ('/tags/njr/rating') = ('njr', '', 'rating')
+                tag_path_split ('foo/rating') = ('njr', 'foo', 'rating')
+                tag_path_split ('/njr/foo/rating') = ('njr', 'foo', 'rating')
+                tag_path_split ('/tags/njr/foo/rating') = ('njr', 'foo',
+                                                                  'rating')
+                tag_path_split ('foo/bar/rating') = ('njr', 'foo/bar', 'rating')
+                tag_path_split ('/njr/foo/bar/rating') = ('njr', 'foo/bar',
+                                                                 'rating')
+                tag_path_split ('/tags/njr/foo/bar/rating') = ('njr', 'foo/bar',
+                                                                  'rating')
+
+           Returns (user, subnamespace, tagname)
+        """
+        if tag in ('', '/'):
+            raise TagPathError, ('%s is not a valid tag path' % tag)
+        tag = self.abs_tag_path (tag)
+        parts = tag.split ('/')
+        subnamespace = ''
+        tagname = parts[-1]
+        if len (parts) < 3:
+            raise TagPathError, ('%s is not a valid tag path' % tag)
+        user = parts[1]
+        if len (parts) > 3:
+            subnamespace = '/'.join (parts[2:-1])
+        return (user, subnamespace, tagname)
+
 
 def object_uri (id):
     """Returns the full URI for the FluidDB object with the given id."""
@@ -294,10 +373,11 @@ class TestFluidDB (unittest.TestCase):
 
     def testSetTag (self):
         db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+        user = db.credentials.username
         o = db.delete_abstract_tag ('testrating')
         o = db.create_abstract_tag ('testrating',
                                 "njr's testrating (0-10; more is better)")
-        o = db.tag_object_by_id (self.DADGAD_ID, 'testrating', 5)
+        o = db.tag_object_by_id (self.DADGAD_ID, '/%s/testrating' % user, 5)
         self.assertEqual (o, 0)
         status, v = db.get_tag_value_by_id (self.DADGAD_ID, 'testrating')
         self.assertEqual (v, 5)
@@ -310,6 +390,30 @@ class TestFluidDB (unittest.TestCase):
         status, v = db.get_tag_value_by_id (self.DADGAD_ID, 'testrating')
         self.assertEqual (v, 5)
 
+    def testUntagObject (self):
+        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+
+        # First tag something
+        o = db.tag_object_by_id (self.DADGAD_ID, 'testrating', 5)
+        self.assertEqual (o, 0)
+
+        # Now untag it
+        error = db.untag_object_by_id (self.DADGAD_ID, 'testrating')
+        self.assertEqual (error, 0)
+        status, v = db.get_tag_value_by_id (self.DADGAD_ID, 'testrating')
+        self.assertEqual (status, STATUS.NOT_FOUND)
+
+        # Now untag it again (should be OK)
+        error = db.untag_object_by_id (self.DADGAD_ID, 'testrating')
+        self.assertEqual (error, 0)
+
+        # And again, but this time asking for error if untagged
+        error = db.untag_object_by_id (self.DADGAD_ID, 'testrating', False)
+        self.assertEqual (error, STATUS.NOT_FOUND)
+
+        
+
+
     def testAddValuelessTag (self):
         db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
         o = db.delete_abstract_tag ('testconvtag')
@@ -320,6 +424,61 @@ class TestFluidDB (unittest.TestCase):
         status, v = db.get_tag_value_by_id (self.DADGAD_ID, 'testconvtag')
         self.assertEqual (v, None)
 
-        
+    def testFullTagPath (self):
+        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+        user = db.credentials.username
+        self.assertEqual (db.full_tag_path ('rating'),
+                          '/tags/%s/rating' % user)
+        self.assertEqual (db.full_tag_path ('/%s/rating' % user),
+                          '/tags/%s/rating' % user)
+        self.assertEqual (db.full_tag_path ('/tags/%s/rating' % user),
+                          '/tags/%s/rating' % user)
+        self.assertEqual (db.full_tag_path ('foo/rating'),
+                          '/tags/%s/foo/rating' % user)
+        self.assertEqual (db.full_tag_path ('/%s/foo/rating' % user),
+                          '/tags/%s/foo/rating' % user)
+        self.assertEqual (db.full_tag_path ('/tags/%s/foo/rating' % user),
+                          '/tags/%s/foo/rating' % user)
+
+    def testAbsTagPath (self):
+        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+        user = db.credentials.username
+        self.assertEqual (db.abs_tag_path ('rating'), '/%s/rating' % user)
+        self.assertEqual (db.abs_tag_path ('/%s/rating' % user),
+                          '/%s/rating' % user)
+        self.assertEqual (db.abs_tag_path ('/tags/%s/rating' % user),
+                          '/%s/rating' % user)
+        self.assertEqual (db.abs_tag_path ('foo/rating'),
+                          '/%s/foo/rating' % user)
+        self.assertEqual (db.abs_tag_path ('/%s/foo/rating' % user),
+                          '/%s/foo/rating' % user)
+        self.assertEqual (db.abs_tag_path ('/tags/%s/foo/rating' % user),
+                          '/%s/foo/rating' % user)
+
+    def testTagPathSplit (self):
+        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+        user = db.credentials.username
+        self.assertEqual (db.tag_path_split ('rating'), (user, '', 'rating'))
+        self.assertEqual (db.tag_path_split ('/%s/rating' % user),
+                          (user, '', 'rating'))
+        self.assertEqual (db.tag_path_split ('/tags/%s/rating' % user),
+                          (user, '', 'rating'))
+        self.assertEqual (db.tag_path_split ('foo/rating'),
+                          (user, 'foo', 'rating'))
+        self.assertEqual (db.tag_path_split ('/%s/foo/rating' % user),
+                          (user, 'foo', 'rating'))
+        self.assertEqual (db.tag_path_split ('/tags/%s/foo/rating' % user),
+                          (user, 'foo', 'rating'))
+        self.assertEqual (db.tag_path_split ('foo/bar/rating'),
+                                (user, 'foo/bar', 'rating'))
+        self.assertEqual (db.tag_path_split ('/%s/foo/bar/rating' % user),
+                          (user, 'foo/bar', 'rating'))
+        self.assertEqual (db.tag_path_split ('/tags/%s/foo/bar/rating' % user),
+                          (user, 'foo/bar', 'rating'))
+        self.assertRaises (TagPathError, db.tag_path_split, '')
+        self.assertRaises (TagPathError, db.tag_path_split, '/')
+        self.assertRaises (TagPathError, db.tag_path_split, '/foo')
+
+
 if __name__ == '__main__':
     unittest.main ()
