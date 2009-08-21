@@ -8,6 +8,7 @@
 #
 # 2008/08/20 v0.1       Initial version.   6 tests pass
 #                       Used to import 1456 objects from delicious sucessfully
+#
 # 2008/08/20 v0.2       Added some path tests and new tag_path_split method.
 #                       Added untag_object_by_id for removing a tag.
 #                       Made it so that 'absolute' paths for tags can be
@@ -18,15 +19,29 @@
 #                       Also, the tests should all actually work for people
 #                       whose FluidDB username isn't njr now :-)
 #                       10 tests pass now.
-# 
+#
+# 2008/08/20 v0.3       Reads the credentials file from the home
+#                       directory (unix/windows).
+#                       Removed import of no-longer-used fuilddb.py
+#                         (most of it was in-lined then bastardized)
+#                       Added ability to use the code from the command line
+#                       for tagging, untagging and retriving objects.
+#                       Currently this can be done by specifying the
+#                       about tag or object ID, though it will soon
+#                       support queries to select objects too (for some value
+#                       of 'soon').
+#                       See the USAGE string for command line usage
+#                       or run with the command line argument -h, or help.
 #
 # Notes: 
 #
 #       Credentials (username and password) are normally read from
 #       a plain text credentials file, or can be passed in explicitly.
-#       I store mine in ~/.fluidDBcredentials.   The format is plain text
-#       with the username on the first line and the password on the second,
-#       no whitespace.   Any further lines are ignored.
+#       The code assumes ~/.fluidDBcredentials on unix and
+#       fluidDBcredentials.ini in the user's home folder on Windows.
+#       The format is plain text with the username on the first line
+#       and the password on the second, no whitespace.
+#       Any further lines are ignored.
 #
 # Conventions in this code:
 #
@@ -44,14 +59,41 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '0.2'
+__version__ = '0.3'
 
-import unittest, os, types, sys, httplib2, urllib
-import fluiddb
+import unittest, os, types, sys, httplib2, urllib, re
 if sys.version_info < (2, 6):
     import simplejson as json
 else:
     import json
+from flags import Flags
+
+USAGE = """Usage examples:
+  Run Tests:
+    fdb test
+
+  Tag objects:
+    fdb tag -a 'DADGAD' tuning rating=10
+    fdb tag -i a984efb2-67d8-4b5c-86d0-267b87832fa4 /njr/tuning /njr/rating=10
+    fdb tag -q 'about = "DADGAD"' tuning rating=10
+
+  Untag objects:
+    fdb untag -a 'DADGAD' /njr/tuning rating
+    fdb untag -i a984efb2-67d8-4b5c-86d0-267b87832fa4
+    fdb untag -q 'about = "DADGAD"' tuning rating
+
+  Fetch objects and show tags
+    fdb get -a 'DADGAD' /njr/tuning /njr/rating 
+    fdb get -i  a984efb2-67d8-4b5c-86d0-267b87832fa4 tuning rating 
+    fdb get -q 'about = "DADGAD"' tuning rating 
+
+  In general:
+    -i is used to specify objects by ID
+    -a is used to specify objects by about tag
+    -q is used to specify objects with a FluidDB query
+
+"""
+
 
 class ProblemReadingCredentialsFileError (Exception): pass
 class BadCredentialsError (Exception): pass
@@ -67,6 +109,14 @@ class STATUS:
     NOT_FOUND = 404
 
 FLUIDDB_PATH = 'http://fluidDB.fluidinfo.com'
+UNIX_CREDENTIALS_FILE='.fluidDBcredentials'
+WINDOWS_CREDENTIALS_FILE='fluidDBcredentials.ini'
+
+SIMPLE_NUMBER_RE = re.compile (r'^[0-9]+$')
+SIGNED_NUMBER_RE = re.compile (r'^[+-]{0,1}[0-9]+$')
+NONNEG_DECIMAL_RE = re.compile (r'^[0-9]+[\.\,]{0,1}[0-9]*$')
+NEG_DECIMAL_RE = re.compile (r'^\-[0-9]+[\.\,]{0,1}[0-9]*$')
+
 
 
 class O:
@@ -86,6 +136,11 @@ class O:
         keys.sort ()
         return '\n'.join (['%20s: %s' % (key, str (self.__dict__[key]))
                                 for key in keys])
+
+class TagValue:
+    def __init__ (self, name, value=None):
+        self.name = name
+        self.value = value
 
 class Credentials:
     """Simple store for user credentials.
@@ -187,7 +242,7 @@ class FluidDB:
             raise NotHandledYetError
         fullnamespace = '/tags/%s' % user
         hash = {'indexed' : indexed, 'description' : description or '',
-                'name' : tag}
+                'name' : tagname}
         fields = json.dumps (hash)
         (status, o) = self.call ('POST', fullnamespace, fields)
         return O(o) if status == STATUS.CREATED else status
@@ -206,6 +261,12 @@ class FluidDB:
 
     def tag_object_by_id (self, id, tag, value=None,
                                 createTagIfNeeded=True):
+        """Tags the object with the given id with the tag
+           given, and the value given, if present.
+           If the (abstract) tag with corresponding to the
+           tag given doesn't exist, it is created unless
+           createTagIfNeeded is set to False.
+        """
         fullTag = self.abs_tag_path (tag)
         hash = {'value' : value}
         fields = json.dumps (hash)
@@ -219,6 +280,19 @@ class FluidDB:
                 return self.tag_object_by_id (id, tag, value, False)
         else:
             return 0 if status == STATUS.NO_CONTENT else status
+
+    def tag_object_by_about (self, about, tag, value=None,
+                             createTagIfNeeded=True):
+        """Tags the object with whose about tag is as specified
+           with the tag and and with the value given, if present.
+           If the (abstract) tag with corresponding to the
+           tag given doesn't exist, it is created unless
+           createTagIfNeeded is set to False.
+        """
+        o = self.create_object (about=about)
+        if type (o) == types.IntType:   # error code
+            return o
+        return self.tag_object_by_id (o.id, tag, value, createTagIfNeeded)
 
     def untag_object_by_id (self, id, tag, missingConstitutesSuccess=True):
         """Removes the tag from the object with id if present.
@@ -236,6 +310,22 @@ class FluidDB:
                 or status == STATUS.NOT_FOUND and missingConstitutesSuccess)
         return 0 if ok else status
 
+    def untag_object_by_about (self, about, tag,
+                               missingConstitutesSuccess=True):
+        """Removes the tag from the object having the about tag
+           specified, if the tag is present.
+           If the tag, or the object, doesn't exist,
+           the default is that this is considered successful,
+           but missingConstitutesSuccess can be set to False
+           to override this behaviour.
+
+           Returns 0 for success, non-zero error code otherwise.
+        """
+        o = self.create_object (about=about)
+        if type (o) == types.IntType:   # error code
+            return o
+        return self.untag_object_by_id (o.id, tag, missingConstitutesSuccess)
+
     def get_tag_value_by_id (self, id, tag):
         """Gets the value of a tag on an object identified by the
            object's ID.
@@ -251,6 +341,24 @@ class FluidDB:
             return status, o['value']
         else:
             return status, None
+
+    def get_tag_value_by_about (self, about, tag):
+        """Gets the value of a tag on an object having the given about tag.
+
+           Returns  returns a 2-tuple, in which the first component
+           is the status, and the second is either the tag value,
+           if the return stats is STATUS.OK, or None otherwise.
+        """
+        o = self.create_object (about=about)
+        if type (o) == types.IntType:   # error code
+            return o
+        return self.get_tag_value_by_id (o.id, tag)
+
+    def get_tag_values_by_id (self, id, tags):
+        return [self.get_tag_value_by_id (id, tag) for tag in tags]
+
+    def get_tag_values_by_about (self, about, tags):
+        return [self.get_tag_value_by_about (about, tag) for tag in tags]
 
     def abs_tag_path (self, tag):
         """Returns the absolute path for the tag nominated,
@@ -345,11 +453,10 @@ def tag_uri (namespace, tag):
     return '%s/tags/%s/%s' % (FLUIDDB_PATH, namespace, tag)
 
 class TestFluidDB (unittest.TestCase):
-    CREDENTIALS_FILE = '/Users/njr/.fluidDBcredentials'
     DADGAD_ID = 'a984efb2-67d8-4b5c-86d0-267b87832fa4'
 
     def testCreateObject (self):
-        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
         o = db.create_object ('DADGAD')
         self.assertEqual (o.id, self.DADGAD_ID)
         self.assertEqual (o.URI, object_uri (self.DADGAD_ID))
@@ -361,7 +468,7 @@ class TestFluidDB (unittest.TestCase):
         self.assertEqual (o, STATUS.INTERNAL_SERVER_ERROR)
 
     def testCreateTag (self):
-        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
         o = db.delete_abstract_tag ('testrating')
         # doesn't really matter if this works or not
 
@@ -371,8 +478,8 @@ class TestFluidDB (unittest.TestCase):
         self.assertEqual (o.URI, tag_uri (db.credentials.username,
                                                 'testrating'))
 
-    def testSetTag (self):
-        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+    def testSetTagByID (self):
+        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
         user = db.credentials.username
         o = db.delete_abstract_tag ('testrating')
         o = db.create_abstract_tag ('testrating',
@@ -382,16 +489,25 @@ class TestFluidDB (unittest.TestCase):
         status, v = db.get_tag_value_by_id (self.DADGAD_ID, 'testrating')
         self.assertEqual (v, 5)
 
+    def testSetTagByAbout (self):
+        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
+        user = db.credentials.username
+        o = db.delete_abstract_tag ('testrating')
+        o = db.tag_object_by_about ('DADGAD', '/%s/testrating' % user, 'five')
+        self.assertEqual (o, 0)
+        status, v = db.get_tag_value_by_about ('DADGAD', 'testrating')
+        self.assertEqual (v, 'five')
+
     def testSetNonExistentTag (self):
-        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
         o = db.delete_abstract_tag ('testrating')
         o = db.tag_object_by_id (self.DADGAD_ID, 'testrating', 5)
         self.assertEqual (o, 0)
         status, v = db.get_tag_value_by_id (self.DADGAD_ID, 'testrating')
         self.assertEqual (v, 5)
 
-    def testUntagObject (self):
-        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+    def testUntagObjectByID (self):
+        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
 
         # First tag something
         o = db.tag_object_by_id (self.DADGAD_ID, 'testrating', 5)
@@ -411,11 +527,21 @@ class TestFluidDB (unittest.TestCase):
         error = db.untag_object_by_id (self.DADGAD_ID, 'testrating', False)
         self.assertEqual (error, STATUS.NOT_FOUND)
 
-        
+    def testUntagObjectByAbout (self):
+        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
 
+        # First tag something
+        o = db.tag_object_by_id (self.DADGAD_ID, 'testrating', 5)
+        self.assertEqual (o, 0)
+
+        # Now untag it
+        error = db.untag_object_by_about ('DADGAD', 'testrating')
+        self.assertEqual (error, 0)
+        status, v = db.get_tag_value_by_about ('DADGAD', 'testrating')
+        self.assertEqual (status, STATUS.NOT_FOUND)
 
     def testAddValuelessTag (self):
-        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
         o = db.delete_abstract_tag ('testconvtag')
         o = db.create_abstract_tag ('testconvtag',
                                 "a conventional (valueless) tag")
@@ -425,7 +551,7 @@ class TestFluidDB (unittest.TestCase):
         self.assertEqual (v, None)
 
     def testFullTagPath (self):
-        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
         user = db.credentials.username
         self.assertEqual (db.full_tag_path ('rating'),
                           '/tags/%s/rating' % user)
@@ -441,7 +567,7 @@ class TestFluidDB (unittest.TestCase):
                           '/tags/%s/foo/rating' % user)
 
     def testAbsTagPath (self):
-        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
         user = db.credentials.username
         self.assertEqual (db.abs_tag_path ('rating'), '/%s/rating' % user)
         self.assertEqual (db.abs_tag_path ('/%s/rating' % user),
@@ -456,7 +582,7 @@ class TestFluidDB (unittest.TestCase):
                           '/%s/foo/rating' % user)
 
     def testTagPathSplit (self):
-        db = FluidDB (Credentials (filename=self.CREDENTIALS_FILE))
+        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
         user = db.credentials.username
         self.assertEqual (db.tag_path_split ('rating'), (user, '', 'rating'))
         self.assertEqual (db.tag_path_split ('/%s/rating' % user),
@@ -480,5 +606,192 @@ class TestFluidDB (unittest.TestCase):
         self.assertRaises (TagPathError, db.tag_path_split, '/foo')
 
 
+def get_credentials_file (unixFile, windowsFile):
+    if os.name == 'posix':
+        homeDir = os.path.expanduser('~')
+        return os.path.join (homeDir, unixFile)
+    elif os.name :
+        from win32com.shell import shellcon, shell
+        homeDir = shell.SHGetFolderPath(0, shellcon.CSIDL_APPDATA, 0, 0)
+        return os.path.join (homeDir, windowsFile)
+    else:
+        return None
+
+def get_typed_tag_value (v):
+    """Uses some simple rules to extract simple typed values from strings.
+        Specifically:
+           true and t (any case) return True (boolean)
+           false and f (any case) return False (boolean)
+           simple integers (possibly signed) are returned as ints
+           simple floats (possibly signed) are returned as floats
+                (supports '.' and ',' as floating-point separator,
+                 subject to locale)
+           Everything else is returned as a string, with matched
+                enclosing quotes stripped.
+    """
+    if v.lower () in ('true', 't'):
+        return True
+    elif v.lower () in ('false', 'f'):
+        return False
+    elif re.match (SIMPLE_NUMBER_RE, v) or re.match (SIGNED_NUMBER_RE, v):
+        return int (v)
+    elif re.match (NONNEG_DECIMAL_RE, v) or re.match (NEG_DECIMAL_RE, v):
+        try:
+            r = float (v)
+        except ValueError:
+            return str (v)
+    elif len (v) > 1 and v[0] == v[-1] and v[0] in ('"\''):
+        return v[1:-1]
+    else:
+        return str (v)
+
+def form_tag_value_pairs (tags):
+    pairs = []
+    for tag in tags:
+        eqPos = tag.find ('=')
+        if eqPos == -1:
+            pairs.append (TagValue (tag, None))
+        else:
+            t = tag[:eqPos]
+            v = get_typed_tag_value (tag[eqPos+1:])
+            pairs.append (TagValue (t, v))
+    return pairs
+
+def usage (error=True):
+    if error:
+        sys.stderr.write (USAGE)
+        sys.exit (1)
+    else:
+        print USAGE
+        sys.exit (0)
+        
+
+def warning (msg):
+    sys.stderr.write ('%s\n' % msg)
+
+def nothing_to_do ():
+    print 'Nothing to do.'
+    sys.exit (0)
+
+def execute_tag_command (flags, db, tags):
+    tags = form_tag_value_pairs (tags)
+    if len (tags) == 0:
+        nothing_to_do ()
+    if flags.about:
+        about = flags.args[0]
+        for tag in tags:
+            o = db.tag_object_by_about (about, tag.name, tag.value)
+            if o == 0:
+                if flags.verbose:
+                    print ('Tagged object with about="%s" with %s'
+                         % (about, formatted_tag_value (tag.name, tag.value)))
+            else:
+                warning ('Failed to tag object with about="%s" with %s'
+                            % (about, tag.name))
+                warning ('Error code %d' % o)
+    elif flags.id:
+        id = flags.args[0]
+        for tag in tags:
+            o = db.tag_object_by_id (id, tag.name, tag.value)
+            if o == 0:
+                if flags.verbose:
+                    print ('Tagged object %s with %s'
+                           % (id, formatted_tag_value (tag.name,tag.value)))
+            else:
+                warning ('Failed to tag object %s with %s'
+                            % (id, tag.name))
+                warning ('Error code %d' % o)
+    elif flags.query:
+        warning ('Queries not handled yet')
+    else:
+        usage ()
+
+def execute_untag_command (flags, db, tags):
+    if flags.about:
+        about = flags.args[0]
+        for tag in tags:
+            o = db.untag_object_by_about (about, tag)
+            if o == 0:
+                if flags.verbose:
+                    print ('Removed tag %s from object with about="%s"'
+                         % (tag, about))
+            else:
+                warning ('Failed to remove tag %s from object with about="%s"'
+                            % (tag, about))
+                warning ('Error code %d' % o)
+    elif flags.id:
+        id = flags.args[0]
+        for tag in tags:
+            o = db.untag_object_by_id (id, tag)
+            if o == 0:
+                if flags.verbose:
+                    print ('Removed tag %s from object %s' % (tag, id))
+            else:
+                warning ('Failed to remove tag %s from object %s '
+                                % (tag, id))
+                warning ('Error code %d' % o)
+    elif flags.query:
+        warning ('Queries not handled yet')
+    else:
+        usage ()
+
+def formatted_tag_value (tag, value):
+    if value == None:
+        return tag
+    elif type (value) in types.StringTypes:
+        return '%s = "%s"' % (tag, value)
+    else:
+        return '%s = %s' % (tag, str (value))
+
+def execute_get_command (flags, db, tags):
+    if flags.about:
+        about = flags.args[0]
+        print 'Object with about=%s:' % about
+    elif flags.id:
+        id = flags.args[0]
+        print 'Object %s:' % id
+    elif flags.query:
+        warning ('Queries not handled yet')
+        return
+    for tag in tags:
+        fulltag = db.abs_tag_path (tag)
+        if flags.about:
+            status, v = db.get_tag_value_by_about (about, tag)
+        elif flags.id:
+            status, v = db.get_tag_value_by_id (id, tag)
+        if status == STATUS.OK:
+            print '  %s' % formatted_tag_value (fulltag, v)
+        elif status == STATUS.NOT_FOUND:
+            print '  <tag %s not present>' % fulltag
+        else:
+            print '<error code %d getting tag %s ' % (o, fulltag)
+
+def execute_command_line (flags, db):
+    if len (flags.args) < 2:
+        usage ()
+    elif flags.command in ('tag', 'untag', 'get'):
+        tags = flags.args[1:]
+        if len (tags) == 0:
+            nothing_to_do ()
+        elif flags.command == 'tag':
+            execute_tag_command (flags, db, tags)
+        elif flags.command == 'untag':
+            execute_untag_command (flags, db, tags)
+        elif flags.command == 'get':
+            execute_get_command (flags, db, tags)
+    else:
+        warning ('Unrecognized command %s' % flags.command)
+        
+CREDENTIALS_FILE = get_credentials_file (UNIX_CREDENTIALS_FILE,
+                                       WINDOWS_CREDENTIALS_FILE)
 if __name__ == '__main__':
-    unittest.main ()
+    flags = Flags (sys.argv[1:], groupable = {'i' : 'id', 'a' : 'about',
+                                          'q' : 'query',
+                                          'v' : 'verbose'})
+    if len (sys.argv) == 1 or flags.command == 'test':
+        suite = unittest.TestLoader().loadTestsFromTestCase(TestFluidDB)
+        unittest.TextTestRunner(verbosity=1).run(suite)
+    else:
+        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
+        execute_command_line (flags, db)
+
