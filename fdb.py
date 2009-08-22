@@ -65,6 +65,15 @@
 #                           fdb testcli --- test CLI only
 #                           fdb testcli --- test DB only
 #
+# 2008/08/22 v0.6       Added delicious2fluiddb.py and its friends
+#                       (delicious.py, delicious.cgi, deliconfig.py)
+#                       to the repository.   This allows all public
+#                       bookmarks from delicious to be uploaded to
+#                       FluidDB.   (In fact, a one line change would
+#                       allow private ones to be uploaded too, but
+#                       since fdb.py knows nothing about permissions
+#                       on tags yet, that seems like a bad idea for now.)
+#
 # Notes: 
 #
 #       Credentials (username and password) are normally read from
@@ -91,7 +100,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '0.5'
+__version__ = '0.6'
 
 import unittest, os, types, sys, httplib2, urllib, re
 if sys.version_info < (2, 6):
