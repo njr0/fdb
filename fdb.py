@@ -74,6 +74,8 @@
 #                       since fdb.py knows nothing about permissions
 #                       on tags yet, that seems like a bad idea for now.)
 #
+# 2008/08/22 v0.7       Corrected copyright year on delicious code
+#
 # Notes: 
 #
 #       Credentials (username and password) are normally read from
@@ -100,7 +102,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '0.6'
+__version__ = '0.7'
 
 import unittest, os, types, sys, httplib2, urllib, re
 if sys.version_info < (2, 6):

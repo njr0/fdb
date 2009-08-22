@@ -2,7 +2,7 @@
 # delicious2fluiddb.py: Import all public bookmarks and their tags
 #                       from del.icio.us and upload them to FluidDB.
 #
-# Copyright (c) Nicholas J. Radcliffe
+# Copyright (c) Nicholas J. Radcliffe 2009
 #
 # See LICENSE for license.
 #

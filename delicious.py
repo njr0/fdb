@@ -1,7 +1,7 @@
 #
 # delicious.py: Construct a home page from del.icio.us
 #
-# Copyright (c) Nicholas J. Radcliffe
+# Copyright (c) Nicholas J. Radcliffe 2008-2009
 #
 # See LICENSE for license.
 #

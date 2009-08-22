@@ -1,7 +1,7 @@
 #
 # deliconfig.py: Configuration file for delicious.py
 #
-# Copyright (c) Nicholas J. Radcliffe
+# Copyright (c) Nicholas J. Radcliffe 2008-2009
 #
 # See LICENSE for license.
 #

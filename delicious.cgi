@@ -1,4 +1,13 @@
 #!/usr/bin/python
+#
+# delicious.cgi: CGI script for building home page from delicious
+#                bookmarks tagged home.
+#
+# Copyright (c) Nicholas J. Radcliffe 2008-2009
+#
+# See LICENSE for license.
+#
+
 import sys, re, socket
 import cgi
 host = socket.gethostbyaddr(socket.gethostname())[0]
