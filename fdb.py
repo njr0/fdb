@@ -76,6 +76,9 @@
 #
 # 2008/08/22 v0.7       Corrected copyright year on delicious code
 #
+# 2008/08/22 v0.8       Added README and README-DELICIOUS files as
+#                       a form of documentation.
+#
 # Notes: 
 #
 #       Credentials (username and password) are normally read from

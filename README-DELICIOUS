@@ -1,0 +1,154 @@
+CODE FOR WORKING WITH DELICIOUS DISTRIBUTED WITH FDB
+====================================================
+
+Because FluidDB shares some characteristics with del.icio.us
+(http://del.icio.us/ or http://delicious.com), some code for
+working with del.icio.us is distributed with fdb.
+
+There are four files:
+
+  1. delicious2fluiddb.py
+     This imports data from del.icio.us to FluidDB.
+     It uses library code from delicious.py (below).
+
+  2. delicious.py
+     This uses the delicious API to extract bookmarks and tags from
+     delicious, as an XML feed, and then to create a web page
+     (normally a home page) with a fairly dense set of links to
+     pages tagged with a paricular tag (normally 'home') on delicious.
+     It also caches the data it extracts (in files).
+
+  3. deliconfig.py
+     This configuration file controls the behaviour of delicious.py.
+     It partly provides information about paths for various data,
+     and partly controls formatting of the home page created by delicious.py
+
+  4. delicious.cgi
+     This is a CGI script that can be used to run delicious.py.
+     The typical usage mode is:
+	Add or modofy some bookmarks on delicious
+	Run the cgi script (usually by clicking a link on the home page).
+	Return home
+     This updates the home page.
+
+
+IMPORTING BOOKMARKS FROM DELICIOUS TO FLUIDDB
+=============================================
+
+This should be straightforward.
+First, make sure that fdb.py is working by running
+the tests.   (See README file.)
+
+Then edit deliconfig.py and at the very least set the
+cache path to an xml file name in location you
+can write to and set credentials to a file containing
+your username and password for delicious on separatelines.
+Like this:
+
+username
+password
+
+You probably also need to set the homepage to a writable
+location.
+
+If all you want to do is upload your bookmarks and tags
+to FluidDB, you can probably ignore the rest.
+
+(Though if you don't have any bookmarks tagged home, it
+might be a good idea to set tags to a bookmark that you
+do have.)
+
+If you have already downloaded your delicious bookmarks
+in xml, just set the cache variable to point to the relevant
+XML file and run with -c.
+
+Then, to download your data from delicious, run
+
+    python delicious.py
+
+If you have already got them in the file, you can skip
+this stage.   (delicious2fluiddb.py reads from the cache.)
+
+Then, to upload to FluidDB, type
+
+    python delicious.py
+
+
+WHAT IT DOES
+============
+
+It creates an object for each of your shared bookmarks with
+about set to URL of the bookmarked page.
+
+Then, for each tag you have, it created a FluidDB tag under
+your username with the same name as the delicious tag.
+
+It currently ignores all other fields, though I will fix that
+in a later release.
+
+
+KNOWN PROBLEMS
+==============
+
+Contrary to the FluidDB documentation, tags with colons
+in the name (notably, tags that start for:) fail.
+This is because FluidDB currently bans colons in tag names.
+This is fixed in the sandbox (as I type), and should go live
+soon, so I don't plan to alter this functionality.
+
+
+NOTE ON DELICIOUS BACKUPS
+=========================
+
+Because the author is paranoid, delicious.py never overwrites
+an XML dump from delicious, but simple renames the old one with
+a datestamp.   I have about 180 backups of delicious.
+Obviously, you can delete them if you don't like keeping backups.
+
+
+CREATING A HOME PAGE
+====================
+
+When you run delicious.py, it creates a web page in the location
+specified by the homepage location in deliconfig.py.
+This basically consists of links for all your bookmarks tagged
+with 'home' (or any any space-separated list of tags you set
+in the variable tags).
+
+The body of the link will be the title from delicious unless you
+put something in the notes field, in which case that will be used
+instead.   This is particularly useful if the title is long.
+
+There's some special functionality allowing two related links
+to be put in one position.   This is achieved, given one link
+call "foo" bu having the notes field of another set to "foo +bar".
+
+If you do this, a single position in the grid will get two links,
+the first called foo, pointing to its URL, and the second called
+bar, pointing to its URL.   For example, Google.com with title
+Google and Google UK with notes set to "Google +UK".
+This produces two adjacent links, the first of which is called Google
+and the second of which is called UK, pointing at the two Google
+sites.
+
+
+CREATING A LINK TO REFRESH YOUR HOME PAGE
+=========================================
+
+If you really like the delicious tag-based home page, you might
+want to install delicious.cgi to run this from a link in your
+browser.   All you really need to do for that is to stick
+delicious.cgi, delicious.py and deliconfig.py into your cgi-bin
+directory, suitably configured, get it running, and then bookmark
+that link from delicious, tagging it with home.
+If you're doing this, you need to make sure that some of the locations
+in deliconfig.py are writable by your Apache (or any other web server
+you might be using.)
+
+When you run it successfully, you get output like this:
+
+Reading entries from del.icio.us
+Writing cache /Users/njr/Sites/cache/delicious.xml
+Building home page /Users/njr/Sites/cache/index.html
+Home page built and backed up
+Completed OK.
