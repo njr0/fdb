@@ -1,3 +1,8 @@
+# flags.py
+#
+# Copyright (c) Nicholas J. Radcliffe 2009.
+# Licence terms in LICENCE.
+
 import sys
 class FlagError (Exception):                    pass
 

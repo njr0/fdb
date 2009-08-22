@@ -1,6 +1,8 @@
 # fdb.py
 #
-# By Nicholas J. Radcliffe, Stochasic Solutions Limited.
+# Copyright (c) Nicholas J. Radcliffe 2009.
+# Licence terms in LICENCE.
+#
 #     building on fluiddb.py by Sanghyeon Seo and Nicholas Tollervey,
 #     which is available from
 #         http://bitbucket.org/sanxiyn/fluidfs/
@@ -46,6 +48,23 @@
 #                       defaults in for credentials etc., making it
 #                       easier to use the lirary interactively.
 #
+# 2008/08/21 v0.5       Renamed command line command get to show to avoid
+#                       clash with http GET command.
+#                       Plan to add raw put, get, post, delete, head commands.
+#                       The tests now assume that the credentials are in
+#                       the standard place (~/.fluidDBcredentials on unix,
+#                       or fluidDBcredential.ini in the home folder on
+#                       windows) and use that, though credentials can still
+#                       be provided in any of the old ways in the interface.
+#
+#                       New class for testing the command line interface (CLI)
+#
+#                       Can now run tests with
+#                           fdb         --- run all tests
+#                           fdb test    --- run all tests
+#                           fdb testcli --- test CLI only
+#                           fdb testcli --- test DB only
+#
 # Notes: 
 #
 #       Credentials (username and password) are normally read from
@@ -72,7 +91,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '0.4'
+__version__ = '0.5'
 
 import unittest, os, types, sys, httplib2, urllib, re
 if sys.version_info < (2, 6):
@@ -83,7 +102,9 @@ from flags import Flags
 
 USAGE = """Usage examples:
   Run Tests:
-    fdb test
+    fdb test            (runs all tests)
+    fdb testcli         (tests command line interface only)
+    fdb testdb          (tests core FluidDB interface only)
 
   Tag objects:
     fdb tag -a 'DADGAD' tuning rating=10
@@ -96,9 +117,9 @@ USAGE = """Usage examples:
     fdb untag -q 'about = "DADGAD"' tuning rating
 
   Fetch objects and show tags
-    fdb get -a 'DADGAD' /njr/tuning /njr/rating 
-    fdb get -i  a984efb2-67d8-4b5c-86d0-267b87832fa4 tuning rating 
-    fdb get -q 'about = "DADGAD"' tuning rating 
+    fdb show -a 'DADGAD' /njr/tuning /njr/rating 
+    fdb show -i  a984efb2-67d8-4b5c-86d0-267b87832fa4 tuning rating 
+    fdb show -q 'about = "DADGAD"' tuning rating 
 
   In general:
     -i is used to specify objects by ID
@@ -113,6 +134,7 @@ class BadCredentialsError (Exception): pass
 class CredentialsFileNotFoundError (Exception): pass
 class NotHandledYetError (Exception): pass
 class TagPathError (Exception): pass
+class ModeError (Exception): pass
 
 class STATUS:
     OK = 200
@@ -130,7 +152,14 @@ SIGNED_NUMBER_RE = re.compile (r'^[+-]{0,1}[0-9]+$')
 NONNEG_DECIMAL_RE = re.compile (r'^[0-9]+[\.\,]{0,1}[0-9]*$')
 NEG_DECIMAL_RE = re.compile (r'^\-[0-9]+[\.\,]{0,1}[0-9]*$')
 
+GROUPABLE_FLAGS = {
+    'i' : 'id',
+    'a' : 'about',
+    'q' : 'query',
+    'v' : 'verbose'
+}
 
+DADGAD_ID = 'a984efb2-67d8-4b5c-86d0-267b87832fa4'
 
 class O:
     """This is really a dummy class that just sticks everything in
@@ -478,165 +507,6 @@ def tag_uri (namespace, tag):
     """Returns the full URI for the FluidDB tag with the given id."""
     return '%s/tags/%s/%s' % (FLUIDDB_PATH, namespace, tag)
 
-class TestFluidDB (unittest.TestCase):
-    DADGAD_ID = 'a984efb2-67d8-4b5c-86d0-267b87832fa4'
-
-    def testCreateObject (self):
-        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
-        o = db.create_object ('DADGAD')
-        self.assertEqual (o.id, self.DADGAD_ID)
-        self.assertEqual (o.URI, object_uri (self.DADGAD_ID))
-
-    def testCreateObjectNoAbout (self):
-        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
-        o = db.create_object ()
-        self.assertEqual (type (o) != types.IntType, True)
-
-    def testCreateObjectFail (self):
-        bad = Credentials ('doesnotexist', 'certainlywiththispassword')
-        db = FluidDB (bad)
-        o = db.create_object ('DADGAD')
-        self.assertEqual (o, STATUS.INTERNAL_SERVER_ERROR)
-
-    def testCreateTag (self):
-        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
-        o = db.delete_abstract_tag ('testrating')
-        # doesn't really matter if this works or not
-
-        o = db.create_abstract_tag ('testrating',
-                                "njr's testrating (0-10; more is better)")
-        self.assertEqual (type (o.id) in types.StringTypes, True)
-        self.assertEqual (o.URI, tag_uri (db.credentials.username,
-                                                'testrating'))
-
-    def testSetTagByID (self):
-        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
-        user = db.credentials.username
-        o = db.delete_abstract_tag ('testrating')
-        o = db.create_abstract_tag ('testrating',
-                                "njr's testrating (0-10; more is better)")
-        o = db.tag_object_by_id (self.DADGAD_ID, '/%s/testrating' % user, 5)
-        self.assertEqual (o, 0)
-        status, v = db.get_tag_value_by_id (self.DADGAD_ID, 'testrating')
-        self.assertEqual (v, 5)
-
-    def testSetTagByAbout (self):
-        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
-        user = db.credentials.username
-        o = db.delete_abstract_tag ('testrating')
-        o = db.tag_object_by_about ('DADGAD', '/%s/testrating' % user, 'five')
-        self.assertEqual (o, 0)
-        status, v = db.get_tag_value_by_about ('DADGAD', 'testrating')
-        self.assertEqual (v, 'five')
-
-    def testSetNonExistentTag (self):
-        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
-        o = db.delete_abstract_tag ('testrating')
-        o = db.tag_object_by_id (self.DADGAD_ID, 'testrating', 5)
-        self.assertEqual (o, 0)
-        status, v = db.get_tag_value_by_id (self.DADGAD_ID, 'testrating')
-        self.assertEqual (v, 5)
-
-    def testUntagObjectByID (self):
-        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
-
-        # First tag something
-        o = db.tag_object_by_id (self.DADGAD_ID, 'testrating', 5)
-        self.assertEqual (o, 0)
-
-        # Now untag it
-        error = db.untag_object_by_id (self.DADGAD_ID, 'testrating')
-        self.assertEqual (error, 0)
-        status, v = db.get_tag_value_by_id (self.DADGAD_ID, 'testrating')
-        self.assertEqual (status, STATUS.NOT_FOUND)
-
-        # Now untag it again (should be OK)
-        error = db.untag_object_by_id (self.DADGAD_ID, 'testrating')
-        self.assertEqual (error, 0)
-
-        # And again, but this time asking for error if untagged
-        error = db.untag_object_by_id (self.DADGAD_ID, 'testrating', False)
-        self.assertEqual (error, STATUS.NOT_FOUND)
-
-    def testUntagObjectByAbout (self):
-        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
-
-        # First tag something
-        o = db.tag_object_by_id (self.DADGAD_ID, 'testrating', 5)
-        self.assertEqual (o, 0)
-
-        # Now untag it
-        error = db.untag_object_by_about ('DADGAD', 'testrating')
-        self.assertEqual (error, 0)
-        status, v = db.get_tag_value_by_about ('DADGAD', 'testrating')
-        self.assertEqual (status, STATUS.NOT_FOUND)
-
-    def testAddValuelessTag (self):
-        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
-        o = db.delete_abstract_tag ('testconvtag')
-        o = db.create_abstract_tag ('testconvtag',
-                                "a conventional (valueless) tag")
-        o = db.tag_object_by_id (self.DADGAD_ID, 'testconvtag')
-        self.assertEqual (o, 0)
-        status, v = db.get_tag_value_by_id (self.DADGAD_ID, 'testconvtag')
-        self.assertEqual (v, None)
-
-    def testFullTagPath (self):
-        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
-        user = db.credentials.username
-        self.assertEqual (db.full_tag_path ('rating'),
-                          '/tags/%s/rating' % user)
-        self.assertEqual (db.full_tag_path ('/%s/rating' % user),
-                          '/tags/%s/rating' % user)
-        self.assertEqual (db.full_tag_path ('/tags/%s/rating' % user),
-                          '/tags/%s/rating' % user)
-        self.assertEqual (db.full_tag_path ('foo/rating'),
-                          '/tags/%s/foo/rating' % user)
-        self.assertEqual (db.full_tag_path ('/%s/foo/rating' % user),
-                          '/tags/%s/foo/rating' % user)
-        self.assertEqual (db.full_tag_path ('/tags/%s/foo/rating' % user),
-                          '/tags/%s/foo/rating' % user)
-
-    def testAbsTagPath (self):
-        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
-        user = db.credentials.username
-        self.assertEqual (db.abs_tag_path ('rating'), '/%s/rating' % user)
-        self.assertEqual (db.abs_tag_path ('/%s/rating' % user),
-                          '/%s/rating' % user)
-        self.assertEqual (db.abs_tag_path ('/tags/%s/rating' % user),
-                          '/%s/rating' % user)
-        self.assertEqual (db.abs_tag_path ('foo/rating'),
-                          '/%s/foo/rating' % user)
-        self.assertEqual (db.abs_tag_path ('/%s/foo/rating' % user),
-                          '/%s/foo/rating' % user)
-        self.assertEqual (db.abs_tag_path ('/tags/%s/foo/rating' % user),
-                          '/%s/foo/rating' % user)
-
-    def testTagPathSplit (self):
-        db = FluidDB (Credentials (filename=CREDENTIALS_FILE))
-        user = db.credentials.username
-        self.assertEqual (db.tag_path_split ('rating'), (user, '', 'rating'))
-        self.assertEqual (db.tag_path_split ('/%s/rating' % user),
-                          (user, '', 'rating'))
-        self.assertEqual (db.tag_path_split ('/tags/%s/rating' % user),
-                          (user, '', 'rating'))
-        self.assertEqual (db.tag_path_split ('foo/rating'),
-                          (user, 'foo', 'rating'))
-        self.assertEqual (db.tag_path_split ('/%s/foo/rating' % user),
-                          (user, 'foo', 'rating'))
-        self.assertEqual (db.tag_path_split ('/tags/%s/foo/rating' % user),
-                          (user, 'foo', 'rating'))
-        self.assertEqual (db.tag_path_split ('foo/bar/rating'),
-                                (user, 'foo/bar', 'rating'))
-        self.assertEqual (db.tag_path_split ('/%s/foo/bar/rating' % user),
-                          (user, 'foo/bar', 'rating'))
-        self.assertEqual (db.tag_path_split ('/tags/%s/foo/bar/rating' % user),
-                          (user, 'foo/bar', 'rating'))
-        self.assertRaises (TagPathError, db.tag_path_split, '')
-        self.assertRaises (TagPathError, db.tag_path_split, '/')
-        self.assertRaises (TagPathError, db.tag_path_split, '/foo')
-
-
 def get_credentials_file (unixFile=UNIX_CREDENTIALS_FILE,
                           windowsFile=WINDOWS_CREDENTIALS_FILE):
     if os.name == 'posix':
@@ -696,7 +566,6 @@ def usage (error=True):
     else:
         print USAGE
         sys.exit (0)
-        
 
 def warning (msg):
     sys.stderr.write ('%s\n' % msg)
@@ -709,8 +578,30 @@ def nothing_to_do ():
     print 'Nothing to do.'
     sys.exit (0)
 
+def describe_by_mode (specifier, mode):
+    """mode can be a string (about, id or query) or a flags object
+        with flags.about, flags.query and flags.id"""    
+    flags = mode
+    if mode == 'about' or (hasattr (flags, 'about') and flags.about):
+        return describe_by_about (specifier)
+    elif mode == 'id' or (hasattr (flags, 'id') and flags.id):
+        return describe_by_id (specifier)
+    elif mode == 'query' or (hasattr (flags, 'query') and flags.query):
+        return describe_by_id (specifier)
+    raise ModeError, 'Bade Mode'
+
+def describe_by_about (specifier):
+    return 'with about="%s"' % specifier
+
+def describe_by_id (specifier):
+    return specifier
+
+def cli_bracket (s):
+    return '(%s)' % s
+
 def execute_tag_command (flags, db, tags, specifier):
     tags = form_tag_value_pairs (tags)
+    description = describe_by_mode (specifier, flags)
     if len (tags) == 0:
         nothing_to_do ()
     if flags.about:
@@ -719,11 +610,12 @@ def execute_tag_command (flags, db, tags, specifier):
             o = db.tag_object_by_about (about, tag.name, tag.value)
             if o == 0:
                 if flags.verbose:
-                    print ('Tagged object with about="%s" with %s'
-                         % (about, formatted_tag_value (tag.name, tag.value)))
+                    print ('Tagged object %s with %s'
+                            % (description,
+                               formatted_tag_value (tag.name, tag.value)))
             else:
-                warning ('Failed to tag object with about="%s" with %s'
-                            % (about, tag.name))
+                warning ('Failed to tag object %s with %s'
+                            % (description, tag.name))
                 warning ('Error code %d' % o)
     else:
         id = specifier
@@ -739,17 +631,18 @@ def execute_tag_command (flags, db, tags, specifier):
                 warning ('Error code %d' % o)
 
 def execute_untag_command (flags, db, tags, specifier):
+    description = describe_by_mode (specifier, flags)
     if flags.about:
         about = specifier
         for tag in tags:
             o = db.untag_object_by_about (about, tag)
             if o == 0:
                 if flags.verbose:
-                    print ('Removed tag %s from object with about="%s"'
-                         % (tag, about))
+                    print ('Removed tag %s from object %s'
+                         % (tag, description))
             else:
-                warning ('Failed to remove tag %s from object with about="%s"'
-                            % (tag, about))
+                warning ('Failed to remove tag %s from object %s'
+                            % (tag, description))
                 warning ('Error code %d' % o)
     else:
         id = specifier
@@ -757,10 +650,11 @@ def execute_untag_command (flags, db, tags, specifier):
             o = db.untag_object_by_id (id, tag)
             if o == 0:
                 if flags.verbose:
-                    print ('Removed tag %s from object %s' % (tag, id))
+                    print ('Removed tag %s from object %s' % (tag,
+                                description))
             else:
                 warning ('Failed to remove tag %s from object %s '
-                                % (tag, id))
+                                % (tag, description))
                 warning ('Error code %d' % o)
 
 def formatted_tag_value (tag, value):
@@ -771,18 +665,19 @@ def formatted_tag_value (tag, value):
     else:
         return '%s = %s' % (tag, str (value))
 
-def get_ids_or_fail (query):
+def get_ids_or_fail (query, db):
     ids = db.query (query)
     if type (ids) == types.IntType:
         fail ('Query failed')
     else:   # list of ids
         return ids
 
-def execute_get_command (flags, db, tags, specifier):
+def execute_show_command (flags, db, tags, specifier):
+    description = describe_by_mode (specifier, flags)
     if flags.about:
-        print 'Object with about=%s:' % specifier
+        print 'Object %s:' % description
     else:
-        print 'Object %s:' % specifier
+        print 'Object %s:' % description
     for tag in tags:
         fulltag = db.abs_tag_path (tag)
         if flags.about:
@@ -792,14 +687,14 @@ def execute_get_command (flags, db, tags, specifier):
         if status == STATUS.OK:
             print '  %s' % formatted_tag_value (fulltag, v)
         elif status == STATUS.NOT_FOUND:
-            print '  <tag %s not present>' % fulltag
+            print '  %s' % cli_bracket ('tag %s not present' % fulltag)
         else:
-            print '<error code %d getting tag %s ' % (o, fulltag)
+            print cli_bracket ('error code %d getting tag %s' % (o, fulltag))
 
 def execute_command_line (flags, db):
     if len (flags.args) < 2:
         usage ()
-    elif flags.command in ('tag', 'untag', 'get'):
+    elif flags.command in ('tag', 'untag', 'show'):
         if not (flags.about or flags.query or flags.id):
             fail ('You must use -q, -a or -i with %s' % flags.command)
         tags = flags.args[1:]
@@ -809,27 +704,328 @@ def execute_command_line (flags, db):
             command = execute_tag_command
         elif flags.command == 'untag':
             command = execute_untag_command
-        elif flags.command == 'get':
-            command = execute_get_command
+        elif flags.command == 'show':
+            command = execute_show_command
         if flags.query:
-            ids = get_ids_or_fail (flags.args[0])
+            ids = get_ids_or_fail (flags.args[0], db)
             for id in ids:
                 command (flags, db, tags, id)
         else:
             command (flags, db, tags, flags.args[0])
     else:
         warning ('Unrecognized command %s' % flags.command)
+
+class TestFluidDB (unittest.TestCase):
+    db = FluidDB ()
+
+    def testCreateObject (self):
+        db = self.db
+        o = db.create_object ('DADGAD')
+        self.assertEqual (o.id, DADGAD_ID)
+        self.assertEqual (o.URI, object_uri (DADGAD_ID))
+
+    def testCreateObjectNoAbout (self):
+        db = self.db
+        o = db.create_object ()
+        self.assertEqual (type (o) != types.IntType, True)
+
+    def testCreateObjectFail (self):
+        bad = Credentials ('doesnotexist', 'certainlywiththispassword')
+        db = FluidDB (bad)
+        o = db.create_object ('DADGAD')
+        self.assertEqual (o, STATUS.INTERNAL_SERVER_ERROR)
+
+    def testCreateTag (self):
+        db = self.db
+        o = db.delete_abstract_tag ('testrating')
+        # doesn't really matter if this works or not
+
+        o = db.create_abstract_tag ('testrating',
+                                "njr's testrating (0-10; more is better)")
+        self.assertEqual (type (o.id) in types.StringTypes, True)
+        self.assertEqual (o.URI, tag_uri (db.credentials.username,
+                                                'testrating'))
+
+    def testSetTagByID (self):
+        db = self.db
+        user = db.credentials.username
+        o = db.delete_abstract_tag ('testrating')
+        o = db.create_abstract_tag ('testrating',
+                                "njr's testrating (0-10; more is better)")
+        o = db.tag_object_by_id (DADGAD_ID, '/%s/testrating' % user, 5)
+        self.assertEqual (o, 0)
+        status, v = db.get_tag_value_by_id (DADGAD_ID, 'testrating')
+        self.assertEqual (v, 5)
+
+    def testSetTagByAbout (self):
+        db = self.db
+        user = db.credentials.username
+        o = db.delete_abstract_tag ('testrating')
+        o = db.tag_object_by_about ('DADGAD', '/%s/testrating' % user, 'five')
+        self.assertEqual (o, 0)
+        status, v = db.get_tag_value_by_about ('DADGAD', 'testrating')
+        self.assertEqual (v, 'five')
+
+    def testSetNonExistentTag (self):
+        db = self.db
+        o = db.delete_abstract_tag ('testrating')
+        o = db.tag_object_by_id (DADGAD_ID, 'testrating', 5)
+        self.assertEqual (o, 0)
+        status, v = db.get_tag_value_by_id (DADGAD_ID, 'testrating')
+        self.assertEqual (v, 5)
+
+    def testUntagObjectByID (self):
+        db = self.db
+
+        # First tag something
+        o = db.tag_object_by_id (DADGAD_ID, 'testrating', 5)
+        self.assertEqual (o, 0)
+
+        # Now untag it
+        error = db.untag_object_by_id (DADGAD_ID, 'testrating')
+        self.assertEqual (error, 0)
+        status, v = db.get_tag_value_by_id (DADGAD_ID, 'testrating')
+        self.assertEqual (status, STATUS.NOT_FOUND)
+
+        # Now untag it again (should be OK)
+        error = db.untag_object_by_id (DADGAD_ID, 'testrating')
+        self.assertEqual (error, 0)
+
+        # And again, but this time asking for error if untagged
+        error = db.untag_object_by_id (DADGAD_ID, 'testrating', False)
+        self.assertEqual (error, STATUS.NOT_FOUND)
+
+    def testUntagObjectByAbout (self):
+        db = self.db
+
+        # First tag something
+        o = db.tag_object_by_id (DADGAD_ID, 'testrating', 5)
+        self.assertEqual (o, 0)
+
+        # Now untag it
+        error = db.untag_object_by_about ('DADGAD', 'testrating')
+        self.assertEqual (error, 0)
+        status, v = db.get_tag_value_by_about ('DADGAD', 'testrating')
+        self.assertEqual (status, STATUS.NOT_FOUND)
+
+    def testAddValuelessTag (self):
+        db = self.db
+        o = db.delete_abstract_tag ('testconvtag')
+        o = db.create_abstract_tag ('testconvtag',
+                                "a conventional (valueless) tag")
+        o = db.tag_object_by_id (DADGAD_ID, 'testconvtag')
+        self.assertEqual (o, 0)
+        status, v = db.get_tag_value_by_id (DADGAD_ID, 'testconvtag')
+        self.assertEqual (v, None)
+
+    def testFullTagPath (self):
+        db = self.db
+        user = db.credentials.username
+        self.assertEqual (db.full_tag_path ('rating'),
+                          '/tags/%s/rating' % user)
+        self.assertEqual (db.full_tag_path ('/%s/rating' % user),
+                          '/tags/%s/rating' % user)
+        self.assertEqual (db.full_tag_path ('/tags/%s/rating' % user),
+                          '/tags/%s/rating' % user)
+        self.assertEqual (db.full_tag_path ('foo/rating'),
+                          '/tags/%s/foo/rating' % user)
+        self.assertEqual (db.full_tag_path ('/%s/foo/rating' % user),
+                          '/tags/%s/foo/rating' % user)
+        self.assertEqual (db.full_tag_path ('/tags/%s/foo/rating' % user),
+                          '/tags/%s/foo/rating' % user)
+
+    def testAbsTagPath (self):
+        db = self.db
+        user = db.credentials.username
+        self.assertEqual (db.abs_tag_path ('rating'), '/%s/rating' % user)
+        self.assertEqual (db.abs_tag_path ('/%s/rating' % user),
+                          '/%s/rating' % user)
+        self.assertEqual (db.abs_tag_path ('/tags/%s/rating' % user),
+                          '/%s/rating' % user)
+        self.assertEqual (db.abs_tag_path ('foo/rating'),
+                          '/%s/foo/rating' % user)
+        self.assertEqual (db.abs_tag_path ('/%s/foo/rating' % user),
+                          '/%s/foo/rating' % user)
+        self.assertEqual (db.abs_tag_path ('/tags/%s/foo/rating' % user),
+                          '/%s/foo/rating' % user)
+
+    def testTagPathSplit (self):
+        db = self.db
+        user = db.credentials.username
+        self.assertEqual (db.tag_path_split ('rating'), (user, '', 'rating'))
+        self.assertEqual (db.tag_path_split ('/%s/rating' % user),
+                          (user, '', 'rating'))
+        self.assertEqual (db.tag_path_split ('/tags/%s/rating' % user),
+                          (user, '', 'rating'))
+        self.assertEqual (db.tag_path_split ('foo/rating'),
+                          (user, 'foo', 'rating'))
+        self.assertEqual (db.tag_path_split ('/%s/foo/rating' % user),
+                          (user, 'foo', 'rating'))
+        self.assertEqual (db.tag_path_split ('/tags/%s/foo/rating' % user),
+                          (user, 'foo', 'rating'))
+        self.assertEqual (db.tag_path_split ('foo/bar/rating'),
+                                (user, 'foo/bar', 'rating'))
+        self.assertEqual (db.tag_path_split ('/%s/foo/bar/rating' % user),
+                          (user, 'foo/bar', 'rating'))
+        self.assertEqual (db.tag_path_split ('/tags/%s/foo/bar/rating' % user),
+                          (user, 'foo/bar', 'rating'))
+        self.assertRaises (TagPathError, db.tag_path_split, '')
+        self.assertRaises (TagPathError, db.tag_path_split, '/')
+        self.assertRaises (TagPathError, db.tag_path_split, '/foo')
+
+class SaveOut:
+    def __init__ (self):
+        self.buffer = []
+
+    def write (self, msg):
+        self.buffer.append (msg)
+
+    def clear (self):
+        self.buffer = []
+
+def specify_DADGAD (mode='about'):
+    if mode == 'about':
+        return ('-a', 'DADGAD')
+    elif mode == 'id':
+        return ('-i', DADGAD_ID)
+    elif mode == 'query':
+        return ('-q', 'fluiddb/about="DADGAD"')
+    else:
+        raise ModeError, 'Bad mode'
+
+
+class TestCLI (unittest.TestCase):
+    db = FluidDB ()
+
+    def setUp (self):
+        self.stdout = sys.stdout
+        self.stderr = sys.stderr
+        self.stealOutput ()
+
+    def stealOutput (self):
+        self.out = SaveOut ()
+        self.err = SaveOut ()
+        sys.stdout = self.out
+        sys.stderr = self.err
+
+    def reset (self):
+        sys.stdout = self.stdout
+        sys.stderr = self.stderr
+
+    def Print (self, msg):
+        self.stdout.write (str (msg) + '\n')
+
+    def testOutputManipulation (self):
+        print 'one'
+        sys.stderr.write ('two')
+        self.reset ()
+        self.assertEqual (self.out.buffer, ['one', '\n'])
+        self.assertEqual (self.err.buffer, ['two'])
+
+    def tagTest (self, mode, verbose=True):
+        self.stealOutput ()
+        (flag, spec) = specify_DADGAD (mode)
+        description = describe_by_mode (spec, mode)
+        flags = ['-v', flag] if verbose else [flag]
+        args = ['tag'] + flags + [spec, 'rating=10']
+        flags = Flags (args, groupable = GROUPABLE_FLAGS)
+        execute_command_line (flags, self.db)
+        self.reset ()
+        if verbose:
+            target = ['Tagged object %s with rating = 10' % description, '\n']
+        else:
+            target = []
+        self.assertEqual (self.out.buffer, target)
+        self.assertEqual (self.err.buffer, [])
+
+    def untagTest (self, mode, verbose=True):
+        self.stealOutput ()
+        (flag, spec) = specify_DADGAD (mode)
+        description = describe_by_mode (spec, mode)
+        flags = ['-v', flag] if verbose else [flag]
+        args = ['untag'] + flags + [spec, 'rating']
+        flags = Flags (args, groupable = GROUPABLE_FLAGS)
+        execute_command_line (flags, self.db)
+        self.reset ()
+        if verbose:
+            target = ['Removed tag rating from object %s' % description, '\n']
+        else:
+            target = []
+        self.assertEqual (self.out.buffer, target)
+        self.assertEqual (self.err.buffer, [])
+
+    def showTaggedSuccessTest (self, mode):
+        self.stealOutput ()
+        (flag, spec) = specify_DADGAD (mode)
+        description = describe_by_mode (spec, mode)
+        args = ['show', '-v', flag, spec, 'rating', '/fluiddb/about']
+        flags = Flags (args, groupable = GROUPABLE_FLAGS)
+        execute_command_line (flags, self.db)
+        self.reset ()
+        self.assertEqual (self.out.buffer,
+                ['Object %s:' % description, '\n',
+                 '  /njr/rating = 10', '\n',
+                 '  /fluiddb/about = "DADGAD"', '\n'])
+        self.assertEqual (self.err.buffer, [])
+
+    def showUntagSuccessTest (self, mode):
+        self.stealOutput ()
+        (flag, spec) = specify_DADGAD (mode)
+        description = describe_by_mode (spec, mode)
+        args = ['show', '-v', flag, spec, 'rating', '/fluiddb/about']
+        flags = Flags (args, groupable = GROUPABLE_FLAGS)
+        execute_command_line (flags, self.db)
+        self.reset ()
+        user = self.db.credentials.username
+        self.assertEqual (self.out.buffer,
+                ['Object %s:' % description, '\n',
+                 '  %s' % cli_bracket ('tag /%s/rating not present' % user),
+
+                '\n', '  /fluiddb/about = "DADGAD"', '\n'])
+        self.assertEqual (self.err.buffer, [])
+
+    def testTagByAboutVerboseShow (self):
+        self.tagTest ('about')
+        self.showTaggedSuccessTest ('about')
+
+    def testTagByIDVerboseShow (self):
+        self.tagTest ('id')
+        self.showTaggedSuccessTest ('id')
+
+    def testTagByQueryVerboseShow (self):
+        self.tagTest ('query', verbose=False)
+        self.showTaggedSuccessTest ('id')
+
+    def testTagSilent (self):
+        self.tagTest ('about', verbose=False)
+        self.showTaggedSuccessTest ('about')
+
+    def testUntagByAboutVerboseShow (self):
+        self.untagTest ('about')
+        self.showUntagSuccessTest ('about')
+
+    def testUntagByIDVerboseShow (self):
+        self.untagTest ('id')
+        self.showUntagSuccessTest ('id')
+
         
-CREDENTIALS_FILE = get_credentials_file ()
 if __name__ == '__main__':
-    flags = Flags (sys.argv[1:], groupable = {'i' : 'id', 'a' : 'about',
-                                          'q' : 'query',
-                                          'v' : 'verbose'})
-    if len (sys.argv) == 1 or flags.command == 'test':
-        suite = unittest.TestLoader().loadTestsFromTestCase(TestFluidDB)
+    flags = Flags (sys.argv[1:], groupable=GROUPABLE_FLAGS)
+    if len (sys.argv) == 1 or flags.command.startswith ('test'):
+        cases = [
+            TestCLI,
+            TestFluidDB
+        ]
+        if flags.command == 'testcli':
+            cases = [TestCLI]
+        if flags.command == 'testdb':
+            cases = [TestFluidDB]
+        suite = unittest.TestSuite ()
+        for c in cases:
+            s = unittest.TestLoader ().loadTestsFromTestCase (c)
+            suite.addTest (s)
         unittest.TextTestRunner(verbosity=1).run(suite)
     else:
-        db = FluidDB (Credentials ())
+        db = FluidDB ()
         execute_command_line (flags, db)
 
-# Set format=json
