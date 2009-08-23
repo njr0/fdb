@@ -92,6 +92,10 @@
 #                       Changed name of createTagIfNeeded parameters
 #                          to createAbstractTagIfNeeded. (Thanks, Xavi!)
 #
+# 2008/08/23 v1.0       Fixed fdb show -a DADGAD /id
+#                       which was doubly broken.
+#                       Hit v1.0 by virtue of adding 0.1 to 0.9 :-)
+#
 #
 # Notes: 
 #
@@ -119,7 +123,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '0.9'
+__version__ = '1.0'
 
 import unittest, os, types, sys, httplib2, urllib, re
 if sys.version_info < (2, 6):
@@ -743,7 +747,7 @@ def execute_show_command (flags, db, tags, specifier):
         fulltag = db.abs_tag_path (tag)
         if tag == '/id':
             if flags.about:
-                o = query ('fluiddb/about = ""' % specifier)
+                o = db.query ('fluiddb/about = "%s"' % specifier)
                 if type (o) == types.IntType: # error
                     status, v = o, None
                 else:
