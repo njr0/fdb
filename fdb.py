@@ -79,6 +79,20 @@
 # 2008/08/22 v0.8       Added README and README-DELICIOUS files as
 #                       a form of documentation.
 #
+# 2008/08/22 v0.9       Added GET, POST, PUT, DELETE, HEAD commands to
+#                       command line interface.
+#                       To be honest, haven't tested most of these,
+#                          but get works in simple cases.
+#                       Added note of count of objects matching a query.
+#                       Added special case: '/about' expands to
+#                           '/fluiddb/about'
+#                       Added count command to CLI.
+#                       Also, in the CLI (but not the API), you can now
+#                          use /id as shorthand for the object's id.
+#                       Changed name of createTagIfNeeded parameters
+#                          to createAbstractTagIfNeeded. (Thanks, Xavi!)
+#
+#
 # Notes: 
 #
 #       Credentials (username and password) are normally read from
@@ -105,14 +119,14 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '0.7'
+__version__ = '0.9'
 
 import unittest, os, types, sys, httplib2, urllib, re
 if sys.version_info < (2, 6):
     import simplejson as json
 else:
     import json
-from flags import Flags
+from flags import Flags, Plural
 
 USAGE = """Usage examples:
   Run Tests:
@@ -135,10 +149,23 @@ USAGE = """Usage examples:
     fdb show -i  a984efb2-67d8-4b5c-86d0-267b87832fa4 tuning rating 
     fdb show -q 'about = "DADGAD"' tuning rating 
 
+  Count objects matching query:
+    fdb count -q 'has fluiddb/users/username'
+
+  Raw HTTP GET:
+    fdb get /tags/njr/google
+    fdb get /permissions/tags/njr/rating action=delete
+    (use POST/PUT/DELETE/HEAD at your peril; currently untested.)
+
   In general:
     -i is used to specify objects by ID
     -a is used to specify objects by about tag
     -q is used to specify objects with a FluidDB query
+
+  Other flags:
+    -sand or -sandbox: use the sandbox at http://sandbox.fluidinfo.com
+    -host hostname: use the specified host (which should start http://
+                    or https://; http:// will be added if it doesn't)
 
 """
 
@@ -149,6 +176,7 @@ class CredentialsFileNotFoundError (Exception): pass
 class NotHandledYetError (Exception): pass
 class TagPathError (Exception): pass
 class ModeError (Exception): pass
+class TooFewArgsForHTTPError (Exception): pass
 
 class STATUS:
     OK = 200
@@ -158,6 +186,7 @@ class STATUS:
     NOT_FOUND = 404
 
 FLUIDDB_PATH = 'http://fluidDB.fluidinfo.com'
+SANDBOX_PATH = 'http://sandbox.fluidinfo.com'
 UNIX_CREDENTIALS_FILE='.fluidDBcredentials'
 WINDOWS_CREDENTIALS_FILE='fluidDBcredentials.ini'
 
@@ -166,13 +195,23 @@ SIGNED_NUMBER_RE = re.compile (r'^[+-]{0,1}[0-9]+$')
 NONNEG_DECIMAL_RE = re.compile (r'^[0-9]+[\.\,]{0,1}[0-9]*$')
 NEG_DECIMAL_RE = re.compile (r'^\-[0-9]+[\.\,]{0,1}[0-9]*$')
 
-GROUPABLE_FLAGS = {
+GROUPABLE = {
     'i' : 'id',
     'a' : 'about',
     'q' : 'query',
-    'v' : 'verbose'
+    'v' : 'verbose',
 }
 
+ARGLESS = {
+    'sand' : 'sandbox',
+    'sandbox' : 'sandbox'
+}
+
+ARGFUL = {
+    'host' : 'host'
+}
+
+HTTP_METHODS = ['GET', 'PUT', 'POST', 'DELETE', 'HEAD']
 DADGAD_ID = 'a984efb2-67d8-4b5c-86d0-267b87832fa4'
 
 class O:
@@ -233,10 +272,13 @@ class FluidDB:
     """Connection to FluidDB that remembers credentials and provides
         methods for some of the common operations."""
 
-    def __init__ (self, credentials=None):
+    def __init__ (self, credentials=None, host=FLUIDDB_PATH):
         if credentials == None:
             credentials = Credentials ()
         self.credentials = credentials
+        self.host = host
+        if not host.startswith ('http'):
+            self.host = 'http://%s' % host
         # the following based on fluiddb.py
         userpass = '%s:%s' % (credentials.username, credentials.password)
         auth = 'Basic %s' % userpass.encode ('base64').strip()
@@ -245,18 +287,20 @@ class FluidDB:
                 'Authorization' : auth
         }
 
-    def call (self, method, path, body=None, **kw):
+    def call (self, method, path, body=None, hash=None, **kw):
         """Calls FluidDB with the attributes given.
            This function was lifted nearly verbatim from fluiddb.py,
            by Sanghyeon Seo, with additions by Nicholas Tollervey.
 
            Returns: a 2-tuple consisting of the status and result
         """
-        http = httplib2.Http()
-        url = FLUIDDB_PATH + urllib.quote(path)
-        if kw:
-            url = '%s?%s' % (url, urllib.urlencode(kw))
-        headers = self.headers.copy()
+        http = httplib2.Http ()
+        url = self.host + urllib.quote (path)
+        if hash:
+            url = '%s?%s' % (url, urllib.urlencode (hash))
+        elif kw:
+            url = '%s?%s' % (url, urllib.urlencode (kw))
+        headers = self.headers.copy ()
         if body:
             headers['content-type'] = 'application/json'
         response, content = http.request(url, method, body, headers)
@@ -317,19 +361,19 @@ class FluidDB:
         return 0 if status == STATUS.NO_CONTENT else status
 
     def tag_object_by_id (self, id, tag, value=None,
-                                createTagIfNeeded=True):
+                                createAbstractTagIfNeeded=True):
         """Tags the object with the given id with the tag
            given, and the value given, if present.
            If the (abstract) tag with corresponding to the
            tag given doesn't exist, it is created unless
-           createTagIfNeeded is set to False.
+           createAbstractTagIfNeeded is set to False.
         """
         fullTag = self.abs_tag_path (tag)
         hash = {'value' : value, 'format' : 'json'}
         fields = json.dumps (hash)
         objTag = '/objects/%s%s' % (id, fullTag)
         (status, o) = self.call ('PUT', objTag, fields)
-        if status == STATUS.NOT_FOUND and createTagIfNeeded:
+        if status == STATUS.NOT_FOUND and createAbstractTagIfNeeded:
             o = self.create_abstract_tag (tag)
             if type (o) == types.IntType:       # error code
                 return o
@@ -339,17 +383,18 @@ class FluidDB:
             return 0 if status == STATUS.NO_CONTENT else status
 
     def tag_object_by_about (self, about, tag, value=None,
-                             createTagIfNeeded=True):
+                             createAbstractTagIfNeeded=True):
         """Tags the object with whose about tag is as specified
            with the tag and and with the value given, if present.
            If the (abstract) tag with corresponding to the
            tag given doesn't exist, it is created unless
-           createTagIfNeeded is set to False.
+           createAbstractTagIfNeeded is set to False.
         """
         o = self.create_object (about=about)
         if type (o) == types.IntType:   # error code
             return o
-        return self.tag_object_by_id (o.id, tag, value, createTagIfNeeded)
+        return self.tag_object_by_id (o.id, tag, value,
+                                      createAbstractTagIfNeeded)
 
     def untag_object_by_id (self, id, tag, missingConstitutesSuccess=True):
         """Removes the tag from the object with id if present.
@@ -450,6 +495,8 @@ class FluidDB:
                 abs_tag_path ('/njr/foo/rating') = '/njr/foo/rating'
                 abs_tag_path ('/tags/njr/foo/rating') = '/njr/foo/rating'
         """
+        if tag == '/about':     # special case
+            return '/fluiddb/about'
         if tag.startswith ('/'):
             if tag.startswith ('/tags/'):
                 return tag[5:]
@@ -694,7 +741,16 @@ def execute_show_command (flags, db, tags, specifier):
         print 'Object %s:' % description
     for tag in tags:
         fulltag = db.abs_tag_path (tag)
-        if flags.about:
+        if tag == '/id':
+            if flags.about:
+                o = query ('fluiddb/about = ""' % specifier)
+                if type (o) == types.IntType: # error
+                    status, v = o, None
+                else:
+                    status, v = STATUS.OK, o[0]
+            else:
+                status, v = STATUS.OK, specifier
+        elif flags.about:
             status, v = db.get_tag_value_by_about (specifier, tag)
         else:
             status, v = db.get_tag_value_by_id (specifier, tag)
@@ -705,14 +761,44 @@ def execute_show_command (flags, db, tags, specifier):
         else:
             print cli_bracket ('error code %d getting tag %s' % (o, fulltag))
 
+
+def execute_http_request (command, flags, db):
+    """Executes a raw HTTP command (GET, PUT, POST, DELETE or HEAD)
+       as specified on the command line."""
+    method = command.upper ()
+    if not method in HTTP_METHODS:
+        raise UnrecognizedHTTPMethodError, ('Only supported HTTP methods are'
+                '%s and %s' % (' '.join (HTTP_METHODS[:-1], HTTP_METHODS[-1])))
+                        
+    if len (flags.args) == 0:
+        raise TooFewArgsForHTTPError, 'HTTP command %s requires a URI' % method
+    uri = flags.args[0]
+    args = form_tag_value_pairs (flags.args[1:])
+    if method == 'PUT':
+        body = {args[0].tag : args[0].value}
+        args = args[1:]
+    else:
+        body=None
+    hash = {}
+    for pair in args:
+        hash[pair.name] = pair.value
+    status, result = db.call (method, uri, body, hash)
+    print 'Status: %d' % status
+    print 'Result: %s' % str (result)
+
+
+
+
 def execute_command_line (flags, db):
-    if len (flags.args) < 2:
+    lccommand = flags.command.lower ()
+    if (len (flags.args) < 2 and
+                 not lccommand.upper () in HTTP_METHODS + ['COUNT']):
         usage ()
-    elif flags.command in ('tag', 'untag', 'show'):
+    elif lccommand in ('tag', 'untag', 'show', 'count'):
         if not (flags.about or flags.query or flags.id):
             fail ('You must use -q, -a or -i with %s' % flags.command)
         tags = flags.args[1:]
-        if len (tags) == 0:
+        if len (tags) == 0 and not lccommand == 'count':
             nothing_to_do ()
         if flags.command == 'tag':
             command = execute_tag_command
@@ -720,12 +806,18 @@ def execute_command_line (flags, db):
             command = execute_untag_command
         elif flags.command == 'show':
             command = execute_show_command
+        elif flags.command == 'count':
+            command = None
         if flags.query:
             ids = get_ids_or_fail (flags.args[0], db)
-            for id in ids:
-                command (flags, db, tags, id)
-        else:
+            print '%s matched' % Plural (len (ids), 'object')
+            if command:
+                for id in ids:
+                    command (flags, db, tags, id)
+        elif command:
             command (flags, db, tags, flags.args[0])
+    elif lccommand in ('get', 'put', 'post', 'delete'):
+        execute_http_request (lccommand, flags, db)
     else:
         warning ('Unrecognized command %s' % flags.command)
 
@@ -942,13 +1034,17 @@ class TestCLI (unittest.TestCase):
         description = describe_by_mode (spec, mode)
         flags = ['-v', flag] if verbose else [flag]
         args = ['tag'] + flags + [spec, 'rating=10']
-        flags = Flags (args, groupable = GROUPABLE_FLAGS)
+        flags = Flags (args, groupable = GROUPABLE, argless=ARGLESS,
+                       argful=ARGFUL)
         execute_command_line (flags, self.db)
         self.reset ()
         if verbose:
             target = ['Tagged object %s with rating = 10' % description, '\n']
         else:
-            target = []
+            if mode == 'query':
+                target = ['1 object matched', '\n']
+            else:
+                target = []
         self.assertEqual (self.out.buffer, target)
         self.assertEqual (self.err.buffer, [])
 
@@ -958,7 +1054,9 @@ class TestCLI (unittest.TestCase):
         description = describe_by_mode (spec, mode)
         flags = ['-v', flag] if verbose else [flag]
         args = ['untag'] + flags + [spec, 'rating']
-        flags = Flags (args, groupable = GROUPABLE_FLAGS)
+        flags = Flags (args, groupable = GROUPABLE, argless=ARGLESS,
+                       argful=ARGFUL)
+
         execute_command_line (flags, self.db)
         self.reset ()
         if verbose:
@@ -973,7 +1071,8 @@ class TestCLI (unittest.TestCase):
         (flag, spec) = specify_DADGAD (mode)
         description = describe_by_mode (spec, mode)
         args = ['show', '-v', flag, spec, 'rating', '/fluiddb/about']
-        flags = Flags (args, groupable = GROUPABLE_FLAGS)
+        flags = Flags (args, groupable = GROUPABLE, argless=ARGLESS,
+                       argful=ARGFUL)
         execute_command_line (flags, self.db)
         self.reset ()
         self.assertEqual (self.out.buffer,
@@ -987,7 +1086,9 @@ class TestCLI (unittest.TestCase):
         (flag, spec) = specify_DADGAD (mode)
         description = describe_by_mode (spec, mode)
         args = ['show', '-v', flag, spec, 'rating', '/fluiddb/about']
-        flags = Flags (args, groupable = GROUPABLE_FLAGS)
+        flags = Flags (args, groupable = GROUPABLE, argless=ARGLESS,
+                       argful=ARGFUL)
+
         execute_command_line (flags, self.db)
         self.reset ()
         user = self.db.credentials.username
@@ -1024,7 +1125,8 @@ class TestCLI (unittest.TestCase):
 
         
 if __name__ == '__main__':
-    flags = Flags (sys.argv[1:], groupable=GROUPABLE_FLAGS)
+    flags = Flags (sys.argv[1:], groupable=GROUPABLE, argless=ARGLESS,
+                   argful=ARGFUL)
     if len (sys.argv) == 1 or flags.command.startswith ('test'):
         cases = [
             TestCLI,
@@ -1040,6 +1142,11 @@ if __name__ == '__main__':
             suite.addTest (s)
         unittest.TextTestRunner(verbosity=1).run(suite)
     else:
-        db = FluidDB ()
+        if flags.host:
+            host = flags.host
+        elif flags.sandbox:
+            host = SANDBOX_PATH
+        else:
+            host = FLUIDDB_PATH
+        db = FluidDB (host=host)
         execute_command_line (flags, db)
-
