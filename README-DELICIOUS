@@ -10,6 +10,8 @@ There are four files:
   1. delicious2fluiddb.py
      This imports data from del.icio.us to FluidDB.
      It uses library code from delicious.py (below).
+     The PDF file delicious2FluidDB.pdf describes what
+     it does with words and pictures.
 
   2. delicious.py
      This uses the delicious API to extract bookmarks and tags from

@@ -97,6 +97,8 @@
 #                       Hit v1.0 by virtue of adding 0.1 to 0.9 :-)
 #
 #
+# 2008/08/23 v1.1       Added delicious2fluiddb.pdf
+#
 # Notes: 
 #
 #       Credentials (username and password) are normally read from
@@ -123,7 +125,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.0'
+__version__ = '1.1'
 
 import unittest, os, types, sys, httplib2, urllib, re
 if sys.version_info < (2, 6):
