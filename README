@@ -1,0 +1,103 @@
+FDB PYTHON LIBRARY
+==================
+
+fdb is a primarily a library for providing access to the FluidDB database
+(http://fluidinfo.com/fluiddb) from Fluidinfo (http://fluidinfo.com/.)
+There is lots of coverage of the library (and its evolution) at
+http://abouttag.blogspot.com/.
+
+
+FDB COMMAND LINE ACCESS
+=======================
+
+fdb can also be used for command-line access to FluidDB.
+See 'USING THE COMMAND LINE', below.
+
+
+DEPENDENCIES
+============
+
+If you're running python 2.6, fdb.py should just run.   With earlier
+version of python, you need to get access to simplejson and httplib2.
+You can get simplejson from http://pypi.python.org/pypi/simplejson/
+and httplib2 from http://code.google.com/p/httplib2/.
+
+
+CREDENTIALS
+===========
+
+For many operations, you also need an account on FluidDB,
+and credentials (a username and password).   You can get these from
+    http://fluidinfo.com/accounts/new
+The library allows you to give it your credentials in various
+different ways, but life is simplest if you stick them in
+a 2-line file (preferably with restricted read access) in the format
+
+username
+password
+
+On Unix, the default location for this is ~/.fluidDBcredentials,
+and on Windows the default file is fluidDBcredentials.ini in your
+home folder.
+
+
+TESTS
+=====
+
+The library includes a set of tests.   If you have valid credentials,
+and everything is OK, these should run successfully if you just execute
+the file fdb.py.   For example, at the time of writing this README file
+(version 0.8 of the fdb), I get this:
+
+$ python fdb.py
+....................
+----------------------------------------------------------------------
+Ran 20 tests in 46.311s
+
+OK
+
+
+USING THE LIBRARY
+=================
+
+Four ways of exploring the library are:
+  1. look at the tests (the ones in the class TestFluidDB)
+  2. look at the blog (http://abouttag.blogspot.com)
+  3. read the function documentation, which is...existent.
+  4. look at and run example.py, which should print DADGAD and 10.
+
+
+USING THE COMMAND LINE
+======================
+
+Commands can be run by giving arguments to fdb.py.
+For a list of commands, use
+
+	python fdb.py help
+
+An example command is
+
+python fdb.py show -a DADGAD rating /fluiddb/about
+
+Obviously, if you want to use fdb as a command from the shell, it will
+probably be convenient to use an alias or create a trivial shell script
+to run it.   I use bash, with the alias
+
+alias fdb='python ~/python/fluiddb/fdb.py'
+
+which allows me to type
+
+fdb show -a DADGAD rating /fluiddb/about
+
+etc.
+
+
+DELICIOUS
+=========
+
+Also distributed with fdb itself is code for accessing delicious.com
+(http://del.icio.us/, as was), and for migrating bookmarks and other
+data to FluidDB.   This also includes functionality for creating web
+homepages from delicious based on a home tag.   See the README-DELICIOUS
+file for details on this functionality.
+

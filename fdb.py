@@ -97,7 +97,9 @@
 #                       Hit v1.0 by virtue of adding 0.1 to 0.9 :-)
 #
 #
-# 2008/08/23 v1.1       Added delicious2fluiddb.pdf
+# 2008/08/23 v1.01      Added delicious2fluiddb.pdf
+#
+# 2008/08/24 v1.11      Added missing README to repository
 #
 # Notes: 
 #
@@ -125,7 +127,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.1'
+__version__ = '1.11'
 
 import unittest, os, types, sys, httplib2, urllib, re
 if sys.version_info < (2, 6):
