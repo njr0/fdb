@@ -101,6 +101,9 @@
 #
 # 2008/08/24 v1.11      Added missing README to repository
 #
+# 2008/08/24 v1.12      Fixed four tests so that they work even
+#                       for user's *not* called njr...
+#
 # Notes: 
 #
 #       Credentials (username and password) are normally read from
@@ -127,7 +130,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.11'
+__version__ = '1.12'
 
 import unittest, os, types, sys, httplib2, urllib, re
 if sys.version_info < (2, 6):
@@ -831,6 +834,7 @@ def execute_command_line (flags, db):
 
 class TestFluidDB (unittest.TestCase):
     db = FluidDB ()
+    user = db.credentials.username
 
     def testCreateObject (self):
         db = self.db
@@ -855,7 +859,7 @@ class TestFluidDB (unittest.TestCase):
         # doesn't really matter if this works or not
 
         o = db.create_abstract_tag ('testrating',
-                                "njr's testrating (0-10; more is better)")
+                        "%s's testrating (0-10; more is better)" % self.user)
         self.assertEqual (type (o.id) in types.StringTypes, True)
         self.assertEqual (o.URI, tag_uri (db.credentials.username,
                                                 'testrating'))
@@ -865,7 +869,7 @@ class TestFluidDB (unittest.TestCase):
         user = db.credentials.username
         o = db.delete_abstract_tag ('testrating')
         o = db.create_abstract_tag ('testrating',
-                                "njr's testrating (0-10; more is better)")
+                         "%s's testrating (0-10; more is better)" % self.user)
         o = db.tag_object_by_id (DADGAD_ID, '/%s/testrating' % user, 5)
         self.assertEqual (o, 0)
         status, v = db.get_tag_value_by_id (DADGAD_ID, 'testrating')
@@ -1010,6 +1014,7 @@ def specify_DADGAD (mode='about'):
 
 class TestCLI (unittest.TestCase):
     db = FluidDB ()
+    user = db.credentials.username
 
     def setUp (self):
         self.stdout = sys.stdout
@@ -1085,7 +1090,7 @@ class TestCLI (unittest.TestCase):
         self.reset ()
         self.assertEqual (self.out.buffer,
                 ['Object %s:' % description, '\n',
-                 '  /njr/rating = 10', '\n',
+                 '  /%s/rating = 10' % self.user, '\n',
                  '  /fluiddb/about = "DADGAD"', '\n'])
         self.assertEqual (self.err.buffer, [])
 
