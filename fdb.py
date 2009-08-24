@@ -104,6 +104,16 @@
 # 2008/08/24 v1.12      Fixed four tests so that they work even
 #                       for user's *not* called njr...
 #
+# 2008/08/24 v1.13      Fixed bug that prevented tagging with real values.
+#                       Added tests for reading various values.
+#                       Made various minor corrections to 
+#                       delicious2fluiddb.pdf.
+#                       Split out test class for FDB internal unit tests
+#                       that don't exercise/require the FluidDB API.
+#                       Added command for that and documented '-v'
+#                       (Also, in fact, fixed and simplied the regular
+#                       expressions for floats and things, which were wrong.)
+#
 # Notes: 
 #
 #       Credentials (username and password) are normally read from
@@ -130,7 +140,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.12'
+__version__ = '1.13'
 
 import unittest, os, types, sys, httplib2, urllib, re
 if sys.version_info < (2, 6):
@@ -144,6 +154,7 @@ USAGE = """Usage examples:
     fdb test            (runs all tests)
     fdb testcli         (tests command line interface only)
     fdb testdb          (tests core FluidDB interface only)
+    fdb testutil        (runs tests not requiring FluidDB access)
 
   Tag objects:
     fdb tag -a 'DADGAD' tuning rating=10
@@ -155,8 +166,7 @@ USAGE = """Usage examples:
     fdb untag -i a984efb2-67d8-4b5c-86d0-267b87832fa4
     fdb untag -q 'about = "DADGAD"' tuning rating
 
-  Fetch objects and show tags
-    fdb show -a 'DADGAD' /njr/tuning /njr/rating 
+  Fetch objects and show tags    fdb show -a 'DADGAD' /njr/tuning /njr/rating 
     fdb show -i  a984efb2-67d8-4b5c-86d0-267b87832fa4 tuning rating 
     fdb show -q 'about = "DADGAD"' tuning rating 
 
@@ -172,6 +182,7 @@ USAGE = """Usage examples:
     -i is used to specify objects by ID
     -a is used to specify objects by about tag
     -q is used to specify objects with a FluidDB query
+    -v encourages FDB to report what it's doing (verbose mode)
 
   Other flags:
     -sand or -sandbox: use the sandbox at http://sandbox.fluidinfo.com
@@ -201,10 +212,9 @@ SANDBOX_PATH = 'http://sandbox.fluidinfo.com'
 UNIX_CREDENTIALS_FILE='.fluidDBcredentials'
 WINDOWS_CREDENTIALS_FILE='fluidDBcredentials.ini'
 
-SIMPLE_NUMBER_RE = re.compile (r'^[0-9]+$')
-SIGNED_NUMBER_RE = re.compile (r'^[+-]{0,1}[0-9]+$')
-NONNEG_DECIMAL_RE = re.compile (r'^[0-9]+[\.\,]{0,1}[0-9]*$')
-NEG_DECIMAL_RE = re.compile (r'^\-[0-9]+[\.\,]{0,1}[0-9]*$')
+INTEGER_RE = re.compile (r'^[+\-]{0,1}[0-9]+$')
+DECIMAL_RE = re.compile (r'^[+\-]{0,1}[0-9]+[\.\,]{0,1}[0-9]*$')
+DECIMAL_RE2 = re.compile (r'^[+\-]{0,1}[\.\,]{1}[0-9]+$')
 
 GROUPABLE = {
     'i' : 'id',
@@ -247,6 +257,10 @@ class TagValue:
     def __init__ (self, name, value=None):
         self.name = name
         self.value = value
+
+    def __str__ (self):
+        return ('Tag "%s", value "%s" of type %s'
+                     % (self.name, str (self.value), str (type (self.value))))
 
 class Credentials:
     """Simple store for user credentials.
@@ -607,13 +621,14 @@ def get_typed_tag_value (v):
         return True
     elif v.lower () in ('false', 'f'):
         return False
-    elif re.match (SIMPLE_NUMBER_RE, v) or re.match (SIGNED_NUMBER_RE, v):
+    elif re.match (INTEGER_RE, v):
         return int (v)
-    elif re.match (NONNEG_DECIMAL_RE, v) or re.match (NEG_DECIMAL_RE, v):
+    elif re.match (DECIMAL_RE, v) or re.match (DECIMAL_RE2, v):
         try:
             r = float (v)
         except ValueError:
             return str (v)
+        return r
     elif len (v) > 1 and v[0] == v[-1] and v[0] in ('"\''):
         return v[1:-1]
     else:
@@ -936,6 +951,10 @@ class TestFluidDB (unittest.TestCase):
         status, v = db.get_tag_value_by_id (DADGAD_ID, 'testconvtag')
         self.assertEqual (v, None)
 
+class TestFDBUtilityFunctions (unittest.TestCase):
+    db = FluidDB ()
+    user = db.credentials.username
+
     def testFullTagPath (self):
         db = self.db
         user = db.credentials.username
@@ -990,6 +1009,46 @@ class TestFluidDB (unittest.TestCase):
         self.assertRaises (TagPathError, db.tag_path_split, '')
         self.assertRaises (TagPathError, db.tag_path_split, '/')
         self.assertRaises (TagPathError, db.tag_path_split, '/foo')
+
+
+    def testTypedValueInterpretation (self):
+        corrects = {
+                'TRUE' : (True, types.BooleanType),
+                'tRuE' : (True, types.BooleanType),
+                't' : (True, types.BooleanType),
+                'T' : (True, types.BooleanType),
+                'f' : (False, types.BooleanType),
+                'false' : (False, types.BooleanType),
+                '1' : (1, types.IntType),
+                '+1' : (1, types.IntType),
+                '-1' : (-1, types.IntType),
+                '0' : (0, types.IntType),
+                '+0' : (0, types.IntType),
+                '-0' : (0, types.IntType),
+                '123456789' : (123456789, types.IntType),
+                '-987654321' : (-987654321, types.IntType),
+                '011' : (11, types.IntType),
+                '-011' : (-11, types.IntType),
+                '3.14159' : (float ("3.14159"), types.FloatType),
+                '-3.14159' : (float ("-3.14159"), types.FloatType),
+                '.14159' : (float (".14159"), types.FloatType),
+                '-.14159' : (float ("-.14159"), types.FloatType),
+                '"1"' : ("1", types.StringType),
+                "DADGAD" : ("DADGAD", types.StringType),
+                "" : ("", types.StringType),
+                '1,300' :  ("1,300", types.StringType), # locale?
+                '.' :  (".", types.StringType), # locale?
+                '+.' :  ("+.", types.StringType), # locale?
+                '-.' :  ("-.", types.StringType), # locale?
+                '+' :  ("+", types.StringType), # locale?
+                '-' :  ("-", types.StringType), # locale?
+
+        }
+        for s in corrects:
+            target, targetType = corrects[s]
+            v = get_typed_tag_value (s)
+            self.assertEqual ((s,v), (s, target))
+            self.assertEqual ((s, type (v)), (s, targetType))
 
 class SaveOut:
     def __init__ (self):
@@ -1143,12 +1202,15 @@ if __name__ == '__main__':
     if len (sys.argv) == 1 or flags.command.startswith ('test'):
         cases = [
             TestCLI,
-            TestFluidDB
+            TestFluidDB,
+            TestFDBUtilityFunctions
         ]
         if flags.command == 'testcli':
             cases = [TestCLI]
         if flags.command == 'testdb':
             cases = [TestFluidDB]
+        if flags.command == 'testutil':
+            cases = [TestFDBUtilityFunctions]
         suite = unittest.TestSuite ()
         for c in cases:
             s = unittest.TestLoader ().loadTestsFromTestCase (c)
