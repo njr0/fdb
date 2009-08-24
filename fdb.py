@@ -114,6 +114,8 @@
 #                       (Also, in fact, fixed and simplied the regular
 #                       expressions for floats and things, which were wrong.)
 #
+# 2008/08/24 v1.14      Fixed delicious.py so it sets the font on the page.
+#
 # Notes: 
 #
 #       Credentials (username and password) are normally read from
@@ -140,7 +142,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.13'
+__version__ = '1.14'
 
 import unittest, os, types, sys, httplib2, urllib, re
 if sys.version_info < (2, 6):

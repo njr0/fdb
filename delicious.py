@@ -19,6 +19,7 @@
 #                       delicious.cgi
 # V1.1  10. 5.2008      Allowed refresh link to be 'just another link'
 # V1.2  22. 8.2009      Removed dependence on jython-compatible XML library
+# V1.3  24. 8.2009      Made font specification work
 
 
 import sys, os, time
@@ -51,7 +52,8 @@ def ParseXMLString (xmlString):
 class PageTemplate:
     def __init__ (self, p):
         self.COLSPEC = ('<col width="%d%%"/>' % (100/p.cols)) * p.cols
-        if p.__dict__.has_key ('font') and p.font:
+
+        if p.font:
             self.FONT_OPEN = '<font face="%s">' % p.font
             self.FONT_CLOSE = '</font>'
         else:
