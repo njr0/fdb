@@ -96,7 +96,6 @@
 #                       which was doubly broken.
 #                       Hit v1.0 by virtue of adding 0.1 to 0.9 :-)
 #
-#
 # 2008/08/23 v1.01      Added delicious2fluiddb.pdf
 #
 # 2008/08/24 v1.11      Added missing README to repository
@@ -115,6 +114,17 @@
 #                       expressions for floats and things, which were wrong.)
 #
 # 2008/08/24 v1.14      Fixed delicious.py so it sets the font on the page.
+#
+# 2008/08/24 v1.15      Fixed problem with value encoding when setting tags.
+#                       (The json format was specification was in the wrong
+#                       place.)
+#                       @paparent helped to locate the problem --- thanks.
+#                       Also changed things so that -host/-sand
+#                       and -D (debug) work when
+#                       running the tests; unfortunately, this works by
+#                       reading the global flags variable.
+#                       Created KNOWN-PROBLEMS file, which is not empty
+#                       for v1.15.
 #
 # Notes: 
 #
@@ -142,7 +152,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.14'
+__version__ = '1.15'
 
 import unittest, os, types, sys, httplib2, urllib, re
 if sys.version_info < (2, 6):
@@ -201,6 +211,7 @@ class NotHandledYetError (Exception): pass
 class TagPathError (Exception): pass
 class ModeError (Exception): pass
 class TooFewArgsForHTTPError (Exception): pass
+class UnexpectedGetValue (Exception): pass
 
 class STATUS:
     OK = 200
@@ -223,11 +234,12 @@ GROUPABLE = {
     'a' : 'about',
     'q' : 'query',
     'v' : 'verbose',
+    'D' : 'debug'
 }
 
 ARGLESS = {
     'sand' : 'sandbox',
-    'sandbox' : 'sandbox'
+    'sandbox' : 'sandbox',
 }
 
 ARGFUL = {
@@ -299,11 +311,12 @@ class FluidDB:
     """Connection to FluidDB that remembers credentials and provides
         methods for some of the common operations."""
 
-    def __init__ (self, credentials=None, host=FLUIDDB_PATH):
+    def __init__ (self, credentials=None, host=FLUIDDB_PATH, debug=False):
         if credentials == None:
             credentials = Credentials ()
         self.credentials = credentials
         self.host = host
+        self.debug = debug
         if not host.startswith ('http'):
             self.host = 'http://%s' % host
         # the following based on fluiddb.py
@@ -313,6 +326,13 @@ class FluidDB:
                 'Accept': 'application/json',
                 'Authorization' : auth
         }
+
+    def set_connection_from_global (self):
+        """Sets the host on the basis of the global variable flags,
+           if that exists.   Used to enable the tests to run against
+           alternate hosts."""
+        self.host = choose_host ()
+        self.debug = choose_debug_mode ()
 
     def call (self, method, path, body=None, hash=None, **kw):
         """Calls FluidDB with the attributes given.
@@ -330,12 +350,21 @@ class FluidDB:
         headers = self.headers.copy ()
         if body:
             headers['content-type'] = 'application/json'
+        if self.debug:
+            print ('method: "%s"\nurl: "%s"\nbody: %s\nheaders:'
+                        % (method, url, body))
+            for k in headers:
+                if not k == 'Authorization':
+                    print '  %s=%s' % (k, headers[k])
         response, content = http.request(url, method, body, headers)
         status = response.status
         if response['content-type'].startswith('application/json'):
             result = json.loads(content)
         else:
             result = content
+        if self.debug:
+            print 'status: %d; content: %s' % (status, str (result))
+
         return status, result
 
     def create_object (self, about=None):
@@ -396,10 +425,11 @@ class FluidDB:
            createAbstractTagIfNeeded is set to False.
         """
         fullTag = self.abs_tag_path (tag)
-        hash = {'value' : value, 'format' : 'json'}
+        hash = {'value' : value}
         fields = json.dumps (hash)
         objTag = '/objects/%s%s' % (id, fullTag)
-        (status, o) = self.call ('PUT', objTag, fields)
+        
+        (status, o) = self.call ('PUT', objTag, fields, format='json')
         if status == STATUS.NOT_FOUND and createAbstractTagIfNeeded:
             o = self.create_abstract_tag (tag)
             if type (o) == types.IntType:       # error code
@@ -465,13 +495,13 @@ class FluidDB:
         """
         fullTag = self.abs_tag_path (tag)
         objTag = '/objects/%s%s' % (id, fullTag)
-        (status, o) = self.call ('GET', objTag)
+        (status, o) = self.call ('GET', objTag, format='json')
         if status == STATUS.OK:
             if type (o) == types.DictType:
                 return status, o['value']
             else:
-                return status, o        # fluiddb/about seems to return a
-                                        # a raw string.   Weird.
+                raise UnexpectedGetValue, ('%s of type %s'
+                                               % (str (o), str (type (o))))
         else:
             return status, None
 
@@ -849,9 +879,24 @@ def execute_command_line (flags, db):
     else:
         warning ('Unrecognized command %s' % flags.command)
 
+def choose_host ():
+    if 'flags' in globals ():
+        if flags.host:
+            return flags.host
+        elif flags.sandbox:
+            return SANDBOX_PATH
+    return FLUIDDB_PATH
+
+def choose_debug_mode ():
+    if 'flags' in globals ():
+        return flags.debug
+
 class TestFluidDB (unittest.TestCase):
     db = FluidDB ()
     user = db.credentials.username
+
+    def setUp (self):
+        self.db.set_connection_from_global ()
 
     def testCreateObject (self):
         db = self.db
@@ -900,6 +945,11 @@ class TestFluidDB (unittest.TestCase):
         self.assertEqual (o, 0)
         status, v = db.get_tag_value_by_about ('DADGAD', 'testrating')
         self.assertEqual (v, 'five')
+
+    def testDeleteNonExistentTag (self):
+        db = self.db
+        o = db.delete_abstract_tag ('testrating')
+        o = db.delete_abstract_tag ('testrating')  # definitely doesn't exist
 
     def testSetNonExistentTag (self):
         db = self.db
@@ -957,6 +1007,9 @@ class TestFDBUtilityFunctions (unittest.TestCase):
     db = FluidDB ()
     user = db.credentials.username
 
+    def setUp (self):
+        self.db.set_connection_from_global ()
+
     def testFullTagPath (self):
         db = self.db
         user = db.credentials.username
@@ -990,6 +1043,7 @@ class TestFDBUtilityFunctions (unittest.TestCase):
 
     def testTagPathSplit (self):
         db = self.db
+
         user = db.credentials.username
         self.assertEqual (db.tag_path_split ('rating'), (user, '', 'rating'))
         self.assertEqual (db.tag_path_split ('/%s/rating' % user),
@@ -1078,6 +1132,7 @@ class TestCLI (unittest.TestCase):
     user = db.credentials.username
 
     def setUp (self):
+        self.db.set_connection_from_global ()
         self.stdout = sys.stdout
         self.stderr = sys.stderr
         self.stealOutput ()
@@ -1197,6 +1252,7 @@ class TestCLI (unittest.TestCase):
         self.untagTest ('id')
         self.showUntagSuccessTest ('id')
 
+
         
 if __name__ == '__main__':
     flags = Flags (sys.argv[1:], groupable=GROUPABLE, argless=ARGLESS,
@@ -1219,11 +1275,5 @@ if __name__ == '__main__':
             suite.addTest (s)
         unittest.TextTestRunner(verbosity=1).run(suite)
     else:
-        if flags.host:
-            host = flags.host
-        elif flags.sandbox:
-            host = SANDBOX_PATH
-        else:
-            host = FLUIDDB_PATH
-        db = FluidDB (host=host)
+        db = FluidDB (host=choose_host (), debug=choose_debug_mode ())
         execute_command_line (flags, db)

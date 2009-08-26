@@ -1,0 +1,50 @@
+MAIN INSTANCE:
+
+  - VALUELESS TAGS
+
+    Creating tags with no value is failing against both the main instance
+    and the sandbox.   There is a known problem with FluidDB causing
+    this, which has been fixed internally, but not yet pushed to the
+    sandbox or the main FluidDB instance.
+
+    So in the current release, one test fails against the main instance
+    and also against the sandbox (though see below).
+
+
+  - NAMESPACES
+
+    Although FDB will happily read tags with long names (njr/foo/bar/bas)
+    it will not currently create them, nor can it set tags with such
+    names.   (This is simply unimplemented.)
+
+  
+SANDBOX:
+
+  - FAILING TESTS
+
+    Although
+
+	fdb test -sand
+
+    will now cause the tests to run against the sandbox, several fail
+    because they assume fixed object IDs that are correct in the main
+    instance but different in the sandbox.   This is deliberate, but
+    at some point I plan to change it so they will/can run against
+    any intance.
+
+  - HANGING TESTS
+
+    Several tests cause a hang against the sandbox, making them hard
+    to use.   I believe these are because of (new) bugs in the sandbox
+    when working with non-existent IDs.   Though, I could be wrong, and
+    and they could simply be bugs in FDB (though it seems OK against the
+    main instance).
+
+    So in practice, the only tests that can be run against the sandbox
+    right now are the utils (which don't actually talk to FluidDB).
+
+	python fdb.py testutil -sand
+
+    Sould produce 4 passes at present.
+
+    
