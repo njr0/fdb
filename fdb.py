@@ -131,6 +131,8 @@
 #                       path.
 #                       Corrected variable used in error reporting
 #                       in execute show_ command.
+#
+# 2008/08/26 v1.17      Added blank line between objects on show -q
 # 
 #
 # Notes: 
@@ -159,7 +161,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.16'
+__version__ = '1.17'
 
 import unittest, os, types, sys, urllib, re
 from httplib2 import Http
@@ -882,6 +884,8 @@ def execute_command_line (flags, db):
             if command:
                 for id in ids:
                     command (flags, db, tags, id)
+                    if flags.command == 'show':
+                        print
         elif command:
             command (flags, db, tags, flags.args[0])
     elif lccommand in ('get', 'put', 'post', 'delete'):
@@ -1181,7 +1185,7 @@ class TestCLI (unittest.TestCase):
             target = ['Tagged object %s with rating = 10' % description, '\n']
         else:
             if mode == 'query':
-                target = ['1 object matched', '\n']
+                target = ['1 object matched', '\n', '\n']
             else:
                 target = []
         self.assertEqual (self.out.buffer, target)
@@ -1283,7 +1287,7 @@ if __name__ == '__main__':
         for c in cases:
             s = unittest.TestLoader ().loadTestsFromTestCase (c)
             suite.addTest (s)
-        unittest.TextTestRunner(verbosity=1).run(suite)
+        unittest.TextTestRunner(verbosity=2).run(suite)
     else:
         db = FluidDB (host=choose_host (), debug=choose_debug_mode ())
         execute_command_line (flags, db)
