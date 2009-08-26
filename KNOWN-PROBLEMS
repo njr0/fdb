@@ -8,7 +8,9 @@ MAIN INSTANCE:
     sandbox or the main FluidDB instance.
 
     So in the current release, one test fails against the main instance
-    and also against the sandbox (though see below).
+    and also against the sandbox (though see below).   This test is
+
+	* TestFluidDB.testAddValuelessTag
 
 
   - NAMESPACES
