@@ -125,6 +125,13 @@
 #                       reading the global flags variable.
 #                       Created KNOWN-PROBLEMS file, which is not empty
 #                       for v1.15.
+# 2008/08/26 v1.16      Changed import httplib2 statement to avoid
+#                       strange hang when importing fdb from somewhere
+#                       other than the current directory through the python
+#                       path.
+#                       Corrected variable used in error reporting
+#                       in execute show_ command.
+# 
 #
 # Notes: 
 #
@@ -152,9 +159,11 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.15'
+__version__ = '1.16'
 
-import unittest, os, types, sys, httplib2, urllib, re
+import unittest, os, types, sys, urllib, re
+from httplib2 import Http
+
 if sys.version_info < (2, 6):
     import simplejson as json
 else:
@@ -341,7 +350,7 @@ class FluidDB:
 
            Returns: a 2-tuple consisting of the status and result
         """
-        http = httplib2.Http ()
+        http = Http ()
         url = self.host + urllib.quote (path)
         if hash:
             url = '%s?%s' % (url, urllib.urlencode (hash))
@@ -817,7 +826,8 @@ def execute_show_command (flags, db, tags, specifier):
         elif status == STATUS.NOT_FOUND:
             print '  %s' % cli_bracket ('tag %s not present' % fulltag)
         else:
-            print cli_bracket ('error code %d getting tag %s' % (o, fulltag))
+            print cli_bracket ('error code %d getting tag %s' % (status,
+                                                                 fulltag))
 
 
 def execute_http_request (command, flags, db):
