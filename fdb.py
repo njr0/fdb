@@ -140,6 +140,8 @@
 #                       unless it has been set to something
 #                       explcitly by the user.
 # 
+# 2008/08/26 v1.18      Removed a couple of test lines left in
+#                       inadvertantly.
 #
 # Notes: 
 #
@@ -167,7 +169,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.17'
+__version__ = '1.18'
 
 import unittest, os, types, sys, urllib, re
 from httplib2 import Http
@@ -1319,6 +1321,4 @@ if __name__ == '__main__':
         unittest.TextTestRunner(verbosity=1).run(suite)
     else:
         db = FluidDB (host=choose_host (), debug=choose_debug_mode ())
-        db.delete_abstract_tag ('dadgad')
-        db.delete_abstract_tag ('dadgad')
         execute_command_line (flags, db)
