@@ -133,6 +133,12 @@
 #                       in execute show_ command.
 #
 # 2008/08/26 v1.17      Added blank line between objects on show -q
+#                       Added -T to allow specification of an Http
+#                       timeout (useful at the moment, where the
+#                       sandbox can hang) and a default timeout of c. 300s.
+#                       Also, I've made the tests set the timeout to 5s
+#                       unless it has been set to something
+#                       explcitly by the user.
 # 
 #
 # Notes: 
@@ -206,6 +212,8 @@ USAGE = """Usage examples:
     -a is used to specify objects by about tag
     -q is used to specify objects with a FluidDB query
     -v encourages FDB to report what it's doing (verbose mode)
+    -D enables debug mode (more output)
+    -T n sets the Http timeout to n seconds
 
   Other flags:
     -sand or -sandbox: use the sandbox at http://sandbox.fluidinfo.com
@@ -235,6 +243,7 @@ FLUIDDB_PATH = 'http://fluidDB.fluidinfo.com'
 SANDBOX_PATH = 'http://sandbox.fluidinfo.com'
 UNIX_CREDENTIALS_FILE='.fluidDBcredentials'
 WINDOWS_CREDENTIALS_FILE='fluidDBcredentials.ini'
+HTTP_TIMEOUT = 300.123456       # unlikey the user will choose this
 
 INTEGER_RE = re.compile (r'^[+\-]{0,1}[0-9]+$')
 DECIMAL_RE = re.compile (r'^[+\-]{0,1}[0-9]+[\.\,]{0,1}[0-9]*$')
@@ -245,7 +254,7 @@ GROUPABLE = {
     'a' : 'about',
     'q' : 'query',
     'v' : 'verbose',
-    'D' : 'debug'
+    'D' : 'debug',
 }
 
 ARGLESS = {
@@ -254,7 +263,8 @@ ARGLESS = {
 }
 
 ARGFUL = {
-    'host' : 'host'
+    'host' : 'host',
+    'T' : 'timeout'
 }
 
 HTTP_METHODS = ['GET', 'PUT', 'POST', 'DELETE', 'HEAD']
@@ -328,6 +338,7 @@ class FluidDB:
         self.credentials = credentials
         self.host = host
         self.debug = debug
+        self.timeout = None
         if not host.startswith ('http'):
             self.host = 'http://%s' % host
         # the following based on fluiddb.py
@@ -344,6 +355,11 @@ class FluidDB:
            alternate hosts."""
         self.host = choose_host ()
         self.debug = choose_debug_mode ()
+        self.timeout = choose_http_timeout ()
+
+    def set_debug_timeout (self, v):
+        if self.timeout == HTTP_TIMEOUT:
+            self.timeout = float (v)
 
     def call (self, method, path, body=None, hash=None, **kw):
         """Calls FluidDB with the attributes given.
@@ -352,7 +368,7 @@ class FluidDB:
 
            Returns: a 2-tuple consisting of the status and result
         """
-        http = Http ()
+        http = Http (timeout=self.timeout)
         url = self.host + urllib.quote (path)
         if hash:
             url = '%s?%s' % (url, urllib.urlencode (hash))
@@ -902,8 +918,11 @@ def choose_host ():
     return FLUIDDB_PATH
 
 def choose_debug_mode ():
-    if 'flags' in globals ():
-        return flags.debug
+    return flags.debug if 'flags' in globals () else False
+
+def choose_http_timeout ():
+    return (float (flags.timeout) if ('flags' in globals ()
+                and flags.timeout != None) else HTTP_TIMEOUT)
 
 class TestFluidDB (unittest.TestCase):
     db = FluidDB ()
@@ -911,6 +930,7 @@ class TestFluidDB (unittest.TestCase):
 
     def setUp (self):
         self.db.set_connection_from_global ()
+        self.db.set_debug_timeout (5.0)
 
     def testCreateObject (self):
         db = self.db
@@ -941,6 +961,7 @@ class TestFluidDB (unittest.TestCase):
                                                 'testrating'))
 
     def testSetTagByID (self):
+        # fails against sandbox
         db = self.db
         user = db.credentials.username
         o = db.delete_abstract_tag ('testrating')
@@ -952,6 +973,7 @@ class TestFluidDB (unittest.TestCase):
         self.assertEqual (v, 5)
 
     def testSetTagByAbout (self):
+        # fails against sandbox
         db = self.db
         user = db.credentials.username
         o = db.delete_abstract_tag ('testrating')
@@ -966,6 +988,7 @@ class TestFluidDB (unittest.TestCase):
         o = db.delete_abstract_tag ('testrating')  # definitely doesn't exist
 
     def testSetNonExistentTag (self):
+        # fails against sandbox
         db = self.db
         o = db.delete_abstract_tag ('testrating')
         o = db.tag_object_by_id (DADGAD_ID, 'testrating', 5)
@@ -974,6 +997,7 @@ class TestFluidDB (unittest.TestCase):
         self.assertEqual (v, 5)
 
     def testUntagObjectByID (self):
+        # fails against sandbox
         db = self.db
 
         # First tag something
@@ -995,6 +1019,7 @@ class TestFluidDB (unittest.TestCase):
         self.assertEqual (error, STATUS.NOT_FOUND)
 
     def testUntagObjectByAbout (self):
+        # fails against sandbox
         db = self.db
 
         # First tag something
@@ -1008,6 +1033,7 @@ class TestFluidDB (unittest.TestCase):
         self.assertEqual (status, STATUS.NOT_FOUND)
 
     def testAddValuelessTag (self):
+        # fails against sandbox
         db = self.db
         o = db.delete_abstract_tag ('testconvtag')
         o = db.create_abstract_tag ('testconvtag',
@@ -1023,6 +1049,7 @@ class TestFDBUtilityFunctions (unittest.TestCase):
 
     def setUp (self):
         self.db.set_connection_from_global ()
+        self.db.set_debug_timeout (5.0)
 
     def testFullTagPath (self):
         db = self.db
@@ -1147,6 +1174,7 @@ class TestCLI (unittest.TestCase):
 
     def setUp (self):
         self.db.set_connection_from_global ()
+        self.db.set_debug_timeout (5.0)
         self.stdout = sys.stdout
         self.stderr = sys.stderr
         self.stealOutput ()
@@ -1185,7 +1213,7 @@ class TestCLI (unittest.TestCase):
             target = ['Tagged object %s with rating = 10' % description, '\n']
         else:
             if mode == 'query':
-                target = ['1 object matched', '\n', '\n']
+                target = ['1 object matched', '\n']
             else:
                 target = []
         self.assertEqual (self.out.buffer, target)
@@ -1247,6 +1275,7 @@ class TestCLI (unittest.TestCase):
         self.showTaggedSuccessTest ('about')
 
     def testTagByIDVerboseShow (self):
+        # fails against sandbox
         self.tagTest ('id')
         self.showTaggedSuccessTest ('id')
 
@@ -1287,7 +1316,9 @@ if __name__ == '__main__':
         for c in cases:
             s = unittest.TestLoader ().loadTestsFromTestCase (c)
             suite.addTest (s)
-        unittest.TextTestRunner(verbosity=2).run(suite)
+        unittest.TextTestRunner(verbosity=1).run(suite)
     else:
         db = FluidDB (host=choose_host (), debug=choose_debug_mode ())
+        db.delete_abstract_tag ('dadgad')
+        db.delete_abstract_tag ('dadgad')
         execute_command_line (flags, db)
