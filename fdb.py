@@ -175,6 +175,9 @@
 #                       function signature), delete does not currently
 #                       support recursive deletion or forcing (in the case
 #                       tags or subnamspaces exist in the namespace).
+#
+# 2008/09/01 v1.20      Added nstest.py to git to illstrate namespace functions
+#                       added in 1.19.
 #                               
 # Notes:
 #
@@ -202,7 +205,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.19'
+__version__ = '1.20'
 
 import unittest, os, types, sys, urllib, re
 from functools import wraps
