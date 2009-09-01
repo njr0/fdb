@@ -145,7 +145,7 @@
 #                       and standardization, most notably:
 #                          -- Using a decorator to avoid code repition
 #                          -- Moving flag/option handling to use the standard
-#                             getopt library instead of the custom flags lib.
+#                             optparse library instead of the custom flags lib.
 #                          -- fixing a couple of bugs
 #                          -- making everything work against the sandbox
 #                             as well as the main instance.
@@ -155,6 +155,27 @@
 #                       The cache would improve performance, and could
 #                       get emptied if corrupted or if the sandbox is reset
 #                       or whatever.
+#
+# 2008/09/01 v1.19      Added calls to the API (only) for creating
+#                       (sub)namespaces, deleting (sub)namespaces and
+#                       fetching descriptions of namespaces.
+#                       These have been manually tested, but no
+#                       units tests have been written yet, and the
+#                       command line interface has neither been extended
+#                       to make use of these calls or to provide new
+#                       primatives to let users use them from the command line.
+#                       All this and more will come.
+#                       The new functions, all methods on FluidDB, are:
+#                           create_namespace
+#                           delete_namespace
+#                           describe_namespace
+#                       create_namespace has an option to recurse if the
+#                       parent doesn't exist.   Although planned for the
+#                       the future (and arguments have been included in the
+#                       function signature), delete does not currently
+#                       support recursive deletion or forcing (in the case
+#                       tags or subnamspaces exist in the namespace).
+#                               
 # Notes:
 #
 #       Credentials (username and password) are normally read from
@@ -181,7 +202,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.18'
+__version__ = '1.19'
 
 import unittest, os, types, sys, urllib, re
 from functools import wraps
@@ -231,7 +252,8 @@ class NotHandledYetError (Exception): pass
 class TagPathError (Exception): pass
 class ModeError (Exception): pass
 class TooFewArgsForHTTPError (Exception): pass
-class UnexpectedGetValue (Exception): pass
+class UnexpectedGetValueError (Exception): pass
+class CannotWriteUserError (Exception): pass
 
 class STATUS:
     OK = 200
@@ -412,6 +434,102 @@ class FluidDB:
         (status, o) = self.call ('POST', '/objects', jAbout)
         return O(o) if status == STATUS.CREATED else status
 
+    def create_namespace (self, path, description='',
+                          createParentIfNeeded=True, verbose=False):
+        """Creates the namespace specified by path using the description
+           given.
+
+           If the parent namespace does not exist, by default it is created
+           with a blank description; however, this behaviour can be
+           overridden by setting createParentIfNeeded to False, in which
+           case NOT_FOUND will be returned in this case.
+
+           Any trailing slash is deleted.
+
+           The path, as usual in FDB, is considered absolute if it starts
+           with a slash, and relative to the user's namespace otherwise.
+
+           Returns ID of namespace object if created successfully.
+           If not, but the request is well formed, the error code returned
+           by FluidDB is returned.
+
+           If the request is ill-formed (doesn't look like a valid namespace),
+           an exception is raised.
+        """
+        fullPath = self.abs_tag_path (path)    # now it starts with /user
+        parts = fullPath.split ('/')[1:]       # remove '' before leading '/'
+        if parts[-1] == '':
+            parts = parts       # ignore a trailing slash, if there was one
+        if len (parts) < 2:     # minimum is 'user' and 'namespace'
+            raise EmptyNamespaceError, ('Attempt to create user namespace %s'
+                                           % fullPath)
+        parent = '/'.join (parts[:-1])
+        containingNS = '/namespaces/%s' % parent
+        subNS = parts[-1]
+        body = json.dumps ({'name' : subNS, 'description' : description})
+        status, result = self.call ('POST', containingNS, body)
+        if status == STATUS.CREATED:
+            id = result['id']
+            if verbose:
+                print 'Created namespace /%s/%s with ID %s' % (parent,
+                                        subNS, id)
+            return id
+        elif status == STATUS.NOT_FOUND:    # parent namespace doesn't exist
+            if not createParentIfNeeded:
+                return status
+            if len (parts) > 2:
+                self.create_namespace ('/' + parent, verbose=verbose)
+                return self.create_namespace (path, description,
+                                              verbose=verbose)  # try again
+            else:
+                user = parts[-1]
+                raise CannotWriteUserError, ('User %s not found or namespace '
+                                             '/%s not writable' % (user, user))
+        else:
+            if verbose:
+                print 'Failed to create namespace %s (%d)' % (fullPath, status)
+            return status
+
+    def delete_namespace (self, path, recurse=False, force=False,
+                          verbose=False):
+        """Deletes the namespace specified by path.
+
+           The path, as usual in FDB, is considered absolute if it starts
+           with a slash, and relative to the user's namespace otherwise.
+
+           recurse and force are not yet implemented.
+        """
+        absPath = self.abs_tag_path (path)
+        fullPath = '/namespaces' + absPath
+        if fullPath.endswith ('/'):
+            fullPath = fullPath[:-1]
+        status, result = self.call ('DELETE', fullPath)
+        if verbose:
+            if status == STATUS.NO_CONTENT:
+                print 'Removed namespace %s' % absPath
+            else:
+                print 'Failed to remove namespace %s (%d)' % (absPath, status)
+        return status
+
+    def describe_namespace (self, path):
+        """Returns an object describing the namespace specified by the path.
+
+           The path, as usual in FDB, is considered absolute if it starts
+           with a slash, and relative to the user's namespace otherwise.
+
+           The object contains attributes tagNames, namespaceNames and
+           path.
+
+           If the call is unsuccessful, an error code is returned instead.
+        """
+        absPath = self.abs_tag_path (path)
+        fullPath = '/namespaces' + absPath
+        if fullPath.endswith ('/'):
+            fullPath = fullPath[:-1]
+        status, result = self.call ('GET', fullPath, returnDescription=True,
+                                      returnTags=True, returnNamespaces=True)
+        return O (result) if status == STATUS.OK else status
+
     def create_abstract_tag (self, tag, description=None, indexed=True):
         """Creates an (abstract) tag with the name (full path) given.
            The tag is not applied to any object.
@@ -503,8 +621,8 @@ class FluidDB:
             if type (o) == types.DictType:
                 return status, o['value']
             else:
-                raise UnexpectedGetValue, ('%s of type %s'
-                                               % (str (o), str (type (o))))
+                raise UnexpectedGetValueError, ('%s of type %s'
+                                                 % (str (o), str (type (o))))
         else:
             return status, None
 
