@@ -178,7 +178,12 @@
 #
 # 2008/09/01 v1.20      Added nstest.py to git to illstrate namespace functions
 #                       added in 1.19.
-#                               
+#
+# 2008/09/01 v1.21      Made tagging of objects create intermediate namespaces
+#                       as required.   This affects both the command line
+#                       utilities and the API calls.   Still no unit tests
+#                       though.
+#
 # Notes:
 #
 #       Credentials (username and password) are normally read from
@@ -205,7 +210,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.20'
+__version__ = '1.21'
 
 import unittest, os, types, sys, urllib, re
 from functools import wraps
@@ -257,6 +262,7 @@ class ModeError (Exception): pass
 class TooFewArgsForHTTPError (Exception): pass
 class UnexpectedGetValueError (Exception): pass
 class CannotWriteUserError (Exception): pass
+class FailedToCreateNamespaceError (Exception): pass
 
 class STATUS:
     OK = 200
@@ -546,12 +552,22 @@ class FluidDB:
         """
         (user, subnamespace, tagname) = self.tag_path_split (tag)
         if subnamespace:
-            raise NotHandledYetError
-        fullnamespace = '/tags/%s' % user
+            fullnamespace = '/tags/%s/%s' % (user, subnamespace)
+        else:
+            fullnamespace = '/tags/%s' % user
         hash = {'indexed' : indexed, 'description' : description or '',
                 'name' : tagname}
         fields = json.dumps (hash)
         (status, o) = self.call ('POST', fullnamespace, fields)
+        if status == STATUS.NOT_FOUND:
+            namespace = '/%s/%s' % (user, subnamespace)
+            id = self.create_namespace (namespace)
+            if type (id) in types.StringTypes:  # is an ID
+                print id
+                (status, o) = self.call ('POST', fullnamespace, fields)
+            else:
+                raise FailedToCreateNamespaceError, ('FDB could not create the'
+                        ' required namespace %s' % namespace)
         return O(o) if status == STATUS.CREATED else status
 
     def delete_abstract_tag (self, tag):
