@@ -12,6 +12,10 @@ class Params:
                                         # Target homepage location.
                                         # Must be writable by web server
                                         # if CGI script is to be used.
+    phonepage = '/Users/njr/Sites/cache/njrnjr.html'
+                                        # Target homepage location.
+                                        # Must be writable by web server
+                                        # if CGI script is to be used.
     cache = '/Users/njr/Sites/cache/delicious.xml'
                                         # Cache of delicious entries.
                                         # Must be writable by web server
@@ -44,6 +48,7 @@ class Params:
     font="Helvetica,Verdana,Arial"      # Leave blank to use browser default
 
     cols = 4                            # number of columns for output page
+    phonecols = 4                       # number of columns for output page
     tags = 'home'                       # space-separated list of tags to use
     caseSensitive = False               # ignore case in matching tags
                                         # and in sort order for page

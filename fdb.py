@@ -64,7 +64,7 @@
 #                           fdb         --- run all tests
 #                           fdb test    --- run all tests
 #                           fdb testcli --- test CLI only
-#                           fdb testcli --- test DB only
+#                           fdb testdb --- test DB only
 #
 # 2008/08/22 v0.6       Added delicious2fluiddb.py and its friends
 #                       (delicious.py, delicious.cgi, deliconfig.py)
@@ -184,6 +184,13 @@
 #                       utilities and the API calls.   Still no unit tests
 #                       though.
 #
+# 2008/09/09 v1.22      Added (optional) logging.
+#                       If two lines are added to the credentials file,
+#                       specifying a send a receive log,
+#                       all HTTP traffic sent and received will be logged,
+#                       with authorization replaced with 'xxx'.
+#                       
+#
 # Notes:
 #
 #       Credentials (username and password) are normally read from
@@ -192,7 +199,8 @@
 #       fluidDBcredentials.ini in the user's home folder on Windows.
 #       The format is plain text with the username on the first line
 #       and the password on the second, no whitespace.
-#       Any further lines are ignored.
+#       As of v1.22, the next two lines, if present, specify log files
+#       for sent and received HTTP traffic, respectively.
 #
 # Conventions in this code:
 #
@@ -210,12 +218,13 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.21'
+__version__ = '1.22'
 
-import unittest, os, types, sys, urllib, re
+import unittest, os, types, sys, urllib, re, random, time
 from functools import wraps
 from itertools import chain, imap
 from httplib2 import Http
+import httplib
 from optparse import OptionParser, OptionGroup
 
 if sys.version_info < (2, 6):
@@ -269,6 +278,7 @@ class STATUS:
     CREATED = 201
     NO_CONTENT = 204
     INTERNAL_SERVER_ERROR = 500
+    UNAUTHORIZED = 401
     NOT_FOUND = 404
 
 FLUIDDB_PATH = 'http://fluidDB.fluidinfo.com'
@@ -281,10 +291,13 @@ INTEGER_RE = re.compile (r'^[+\-]{0,1}[0-9]+$')
 DECIMAL_RE = re.compile (r'^[+\-]{0,1}[0-9]+[\.\,]{0,1}[0-9]*$')
 DECIMAL_RE2 = re.compile (r'^[+\-]{0,1}[\.\,]{1}[0-9]+$')
 
-HTTP_METHODS = ['GET', 'PUT', 'POST', 'DELETE', 'HEAD']
+JSON_TYPE = 'application/vnd.fluiddb.value+json'
 
-IDS_MAIN = {'DADGAD' : 'a984efb2-67d8-4b5c-86d0-267b87832fa4'}
-IDS_SAND = {'DADGAD' : '1fb8e9cb-70b9-4bd0-a7e7-880247384abd'}
+HTTP_METHODS = ['GET', 'PUT', 'POST', 'DELETE', 'HEAD']
+ORIG_IDS_MAIN = {'DADGAD' : 'a984efb2-67d8-4b5c-86d0-267b87832fa4'}
+IDS_SAND = {'DADGAD' : '024c80fb-04f9-423d-94da-a0f9cfd417b8'}
+IDS_MAIN = {'DADGAD' : '1fb8e9cb-70b9-4bd0-a7e7-880247384abd'}
+
 
 def id (about, host):
     # this might turn into a cache that gets dumped to file and
@@ -296,7 +309,7 @@ def by_about(f):
     @wraps(f)
     def wrapper(self, about, *args, **kwargs):
         o = self.create_object(about=about)
-        if type(o) == types.IntType:   # error code
+        if type(o) == int:   # error code
             return o
         return f(self, o.id, *args, **kwargs)
     return wrapper
@@ -330,13 +343,34 @@ class TagValue:
 
 class Credentials:
     """Simple store for user credentials.
+
         Can be initialized with username and password
         or by pointing to a file (filename) with the username
         on the first line and the password on the second line.
+
         If neither password nor filename is given,
-        th default credentials file will be used, if available.
+        the default credentials file will be used, if available.
+
+        File can be specified for logging outgoing and incoming transactions.
+        These can be the same or difference.
+
+        If a credentials file is given, the third line of the file
+        specifies the log file for outgoing transactions (sends)
+        and the fourth line specifies the file for responses received.
+
+        No special precautions are taken to lock the file, at this point,
+        so this is not thread-safe or multi-user safe or anything.
+
+        The log file names given are prepended with the username and '-',
+        e.g. if you it it to send.log, this will generate foo-send.log,
+        bar-send.log.
+
+        The path name should usually be absolute.
     """
-    def __init__ (self, username=None, password=None, id=None, filename=None):
+    def __init__ (self, username=None, password=None, id=None, filename=None,
+                  sendLog=None, receiveLog=None):
+        self.sendLog = sendLog
+        self.receiveLog = receiveLog
         if username:
             self.username = username
             self.password = password
@@ -349,7 +383,19 @@ class Credentials:
                     lines = f.readlines ()
                     self.username = lines[0].strip ()
                     self.password = lines[1].strip ()
+                    if len (lines) > 3:
+                        self.sendLog = lines[2].strip ()
+                        self.receiveLog = lines[3].strip ()
+                        for direction in ('send', 'receive'):
+                            try:
+                                file = self.get_log_file (direction)
+                                F = open (file, 'a')
+                                F.close ()
+                            except:
+                                sys.stderr.write ('Failed to write to %s log '
+                                           'file %s.\n' % (direction, file))
                     f.close ()
+                        
                 except:
                     raise ProblemReadingCredentialsFileError, ('Failed to read'
                             ' credentials from %s.' % str (filename))
@@ -358,6 +404,16 @@ class Credentials:
                             'read credentials from %s.' % str (filename))
 
         self.id = id
+
+    def get_log_file (self, direction):
+        assert direction in ('send', 'receive')
+        log = self.sendLog if direction == 'send' else self.receiveLog
+        if log == None:
+             return None
+        dir, file = os.path.split (log)
+        return os.path.join (dir, '%s-%s' % (self.username, file))
+        
+
 
 class FluidDB:
     """Connection to FluidDB that remembers credentials and provides
@@ -378,7 +434,7 @@ class FluidDB:
         userpass = '%s:%s' % (credentials.username, credentials.password)
         auth = 'Basic %s' % userpass.encode ('base64').strip()
         self.headers = {
-                'Accept': 'application/json',
+                'Accept': JSON_TYPE, 
                 'Authorization' : auth
         }
 
@@ -401,31 +457,91 @@ class FluidDB:
 
            Returns: a 2-tuple consisting of the status and result
         """
-        http = Http (timeout=self.timeout)
+#        http = Http (timeout=self.timeout)
+        http = httplib.HTTPConnection (self.host[7:])
         url = self.host + urllib.quote (path)
         if hash:
             url = '%s?%s' % (url, urllib.urlencode (hash))
-        elif kw:
-            url = '%s?%s' % (url, urllib.urlencode (kw))
         headers = self.headers.copy ()
         if body:
-            headers['content-type'] = 'application/json'
+            headers['content-type'] = JSON_TYPE
         if self.debug:
             print ('method: "%s"\nurl: "%s"\nbody: %s\nheaders:'
                         % (method, url, body))
             for k in headers:
                 if not k == 'Authorization':
                     print '  %s=%s' % (k, headers[k])
-        response, content = http.request(url, method, body, headers)
+        sanitized_headers = {}
+        for k in headers:
+            if k == 'Authorization':
+                sanitized_headers[k] = 'xxx' if headers[k] else ''
+            else:
+                sanitized_headers[k] = headers[k]
+        
+        transID = self.log_send (url, method, body, sanitized_headers)
+#        response, content = http.request(url, method, body, headers)
+        http.request(method, url, body, headers)
+        response = http.getresponse ()
         status = response.status
-        if response['content-type'].startswith('application/json'):
+        content = response.read ()
+        self.log_receive (transID, status, content)
+        if response['content-type'].startswith(JSON_TYPE):
             result = json.loads(content)
         else:
             result = content
         if self.debug:
             print 'status: %d; content: %s' % (status, str (result))
-
         return status, result
+
+    def timestamp (self, plusHex=False):
+        t = time.time ()
+        s = time.localtime (t)
+        secs = int (t)
+        subsecs = int ((t - secs) * 10000000)
+        ts = '%s.%07d' % (time.strftime ('%Y/%m/%d %H:%M:%S', s), subsecs)
+        if plusHex:
+            r = int (random.random () * 0x1000000)
+            hex = '%08X.%06X.%06X' % (secs, subsecs, r)
+            return ts, hex
+        else:
+            return ts
+
+    def escape_d (self, s):
+        return s.replace ('"', r'\"')
+
+    def escape_s (self, s):
+        return s.replace ("'", r"\'")
+
+    def log_send (self, url, method, body, headers):
+        file = self.credentials.get_log_file ('send')
+        ts, transID = self.timestamp (True)
+        if file:
+            try:
+                f = open (file, 'a')
+                f.write ('%s,%s,"%s","%s","%s","%s"\n'
+                                % (transID, ts, self.escape_d (url),
+                                   self.escape_d (method),
+                                   self.escape_d (str (body)),
+                                   self.escape_d (str (headers))))
+                f.close ()
+            except:
+                pass
+        return transID
+
+    def log_receive (self, transID, status, content):
+        file = self.credentials.get_log_file ('receive')
+        ts = self.timestamp (False)
+        assert type (status) == int
+        if file:
+            try:
+                f = open (file, 'a')
+                f.write ("%s,%s,%d,'%s'\n"
+                                % (transID, ts, status,
+                                   self.escape_s (content)))
+                f.close ()
+            except:
+                pass
+        return transID
 
     def create_object (self, about=None):
         """Creates an object with the about tag given.
@@ -518,7 +634,7 @@ class FluidDB:
                 print 'Removed namespace %s' % absPath
             else:
                 print 'Failed to remove namespace %s (%d)' % (absPath, status)
-        return status
+        return 0 if status == STATUS.NO_CONTENT else status
 
     def describe_namespace (self, path):
         """Returns an object describing the namespace specified by the path.
@@ -563,7 +679,6 @@ class FluidDB:
             namespace = '/%s/%s' % (user, subnamespace)
             id = self.create_namespace (namespace)
             if type (id) in types.StringTypes:  # is an ID
-                print id
                 (status, o) = self.call ('POST', fullnamespace, fields)
             else:
                 raise FailedToCreateNamespaceError, ('FDB could not create the'
@@ -598,7 +713,7 @@ class FluidDB:
         (status, o) = self.call ('PUT', objTag, fields, format='json')
         if status == STATUS.NOT_FOUND and createAbstractTagIfNeeded:
             o = self.create_abstract_tag (tag)
-            if type (o) == types.IntType:       # error code
+            if type (o) == int:       # error code
                 return o
             else:
                 return self.tag_object_by_id (id, tag, value, False)
@@ -888,7 +1003,7 @@ def formatted_tag_value (tag, value):
 
 def get_ids_or_fail (query, db):
     ids = db.query(query)
-    if type (ids) == types.IntType:
+    if type (ids) == int:
         fail ('Query failed')
     else:   # list of ids
         print '%s matched' % Plural (len (ids), 'object')
@@ -908,10 +1023,15 @@ def execute_show_command (objs, db, tags, options):
             if tag == '/id':
                 if obj.mode == 'about':
                     o = db.query ('fluiddb/about = "%s"' % obj.specifier)
-                    if type (o) == types.IntType: # error
+                    if type (o) == int: # error
                         status, v = o, None
+                    elif type (o) in (list, tuple):
+                        if len (o) > 0:
+                            status, v = STATUS.OK, o[0]
+                        else:
+                            status, v = STATUS.OK, None
                     else:
-                        status, v = STATUS.OK, o[0]
+                        status, v = STATUS.OK, o # Not sure this should happen
                 else:
                     status, v = STATUS.OK, specifier
             else:
@@ -1016,7 +1136,7 @@ class TestFluidDB (unittest.TestCase):
     def testCreateObjectNoAbout (self):
         db = self.db
         o = db.create_object ()
-        self.assertEqual (type (o) != types.IntType, True)
+        self.assertEqual (type (o) != int, True)
 
     def testCreateObjectFail (self):
         bad = Credentials ('doesnotexist', 'certainlywiththispassword')
@@ -1186,26 +1306,26 @@ class TestFDBUtilityFunctions (unittest.TestCase):
 
     def testTypedValueInterpretation (self):
         corrects = {
-                'TRUE' : (True, types.BooleanType),
-                'tRuE' : (True, types.BooleanType),
-                't' : (True, types.BooleanType),
-                'T' : (True, types.BooleanType),
-                'f' : (False, types.BooleanType),
-                'false' : (False, types.BooleanType),
-                '1' : (1, types.IntType),
-                '+1' : (1, types.IntType),
-                '-1' : (-1, types.IntType),
-                '0' : (0, types.IntType),
-                '+0' : (0, types.IntType),
-                '-0' : (0, types.IntType),
-                '123456789' : (123456789, types.IntType),
-                '-987654321' : (-987654321, types.IntType),
-                '011' : (11, types.IntType),
-                '-011' : (-11, types.IntType),
-                '3.14159' : (float ("3.14159"), types.FloatType),
-                '-3.14159' : (float ("-3.14159"), types.FloatType),
-                '.14159' : (float (".14159"), types.FloatType),
-                '-.14159' : (float ("-.14159"), types.FloatType),
+                'TRUE' : (True, bool),
+                'tRuE' : (True, bool),
+                't' : (True, bool),
+                'T' : (True, bool),
+                'f' : (False, bool),
+                'false' : (False, bool),
+                '1' : (1, int),
+                '+1' : (1, int),
+                '-1' : (-1, int),
+                '0' : (0, int),
+                '+0' : (0, int),
+                '-0' : (0, int),
+                '123456789' : (123456789, int),
+                '-987654321' : (-987654321, int),
+                '011' : (11, int),
+                '-011' : (-11, int),
+                '3.14159' : (float ("3.14159"), float),
+                '-3.14159' : (float ("-3.14159"), float),
+                '.14159' : (float (".14159"), float),
+                '-.14159' : (float ("-.14159"), float),
                 '"1"' : ("1", types.StringType),
                 "DADGAD" : ("DADGAD", types.StringType),
                 "" : ("", types.StringType),
