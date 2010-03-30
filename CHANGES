@@ -180,5 +180,8 @@
 #                       FluidDB response to using bad credentials.
 # 2010/03/26 v1.24      Fixed some weird indentation. Added encoding.
 # 2010/03/28 v1.25      Fixed a unicode problem and some help text.
+# 2010/03/30 v1.26      Changed the default action to be help, rather
+#                       than running tests.
+#                       Added tags command.
 
 

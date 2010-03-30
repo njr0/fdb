@@ -37,7 +37,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.25'
+__version__ = '1.26'
 
 import unittest, os, types, sys, urllib, re
 from functools import wraps
@@ -50,6 +50,7 @@ if sys.version_info < (2, 6):
 else:
     import json
 
+DADGAD_ID = u'ca0f03b5-3c0d-4c00-aa62-bdb07f29599c'
 USAGE = """Run Tests:
    fdb test            (runs all tests)
    fdb testcli         (tests command line interface only)
@@ -58,26 +59,31 @@ USAGE = """Run Tests:
 
  Tag objects:
    fdb tag -a 'DADGAD' tuning rating=10
-   fdb tag -i a984efb2-67d8-4b5c-86d0-267b87832fa4 /njr/tuning /njr/rating=10
+   fdb tag -i %s /njr/tuning /njr/rating=10
    fdb tag -q 'about = "DADGAD"' tuning rating=10
 
  Untag objects:
    fdb untag -a 'DADGAD' /njr/tuning rating
-   fdb untag -i a984efb2-67d8-4b5c-86d0-267b87832fa4
+   fdb untag -i %s
    fdb untag -q 'about = "DADGAD"' tuning rating
 
- Fetch objects and show tags    fdb show -a 'DADGAD' /njr/tuning /njr/rating
-   fdb show -i  a984efb2-67d8-4b5c-86d0-267b87832fa4 tuning rating
+ Fetch objects and show tags
+   fdb show -a 'DADGAD' /njr/tuning /njr/rating
+   fdb show -i %s tuning rating
    fdb show -q 'about = "DADGAD"' tuning rating
 
  Count objects matching query:
    fdb count -q 'has fluiddb/users/username'
 
+ Get tags on objects and their values:
+   fdb tags -a 'DADGAD'
+   fdb -i %s
+
  Raw HTTP GET:
    fdb get /tags/njr/google
    fdb get /permissions/tags/njr/rating action=delete
    (use POST/PUT/DELETE/HEAD at your peril; currently untested.)
-"""
+""" % (DADGAD_ID, DADGAD_ID, DADGAD_ID, DADGAD_ID)
 
 class ProblemReadingCredentialsFileError(Exception): pass
 class BadCredentialsError(Exception): pass
@@ -89,6 +95,7 @@ class TooFewArgsForHTTPError(Exception): pass
 class UnexpectedGetValueError(Exception): pass
 class CannotWriteUserError(Exception): pass
 class FailedToCreateNamespaceError(Exception): pass
+class ObjectNotFoundError(Exception): pass
 
 class STATUS:
     OK = 200
@@ -114,7 +121,7 @@ DECIMAL_RE2 = re.compile(r'^[+\-]{0,1}[\.\,]{1}[0-9]+$')
 HTTP_METHODS = ['GET', 'PUT', 'POST', 'DELETE', 'HEAD']
 
 IDS_MAIN = {u'DADGAD' : u'1fb8e9cb-70b9-4bd0-a7e7-880247384abd'}
-IDS_SAND = {u'DADGAD' : u'ca0f03b5-3c0d-4c00-aa62-bdb07f29599c'}
+IDS_SAND = {u'DADGAD' : DADGAD_ID}
 
 DEFAULT_ENCODING = 'UTF-8'
 
@@ -255,10 +262,11 @@ class FluidDB:
         if body:
             headers[u'content-type'] = u'application/json'
 
-        if 1:
+        if True:
             k2 = {}
             for k in kw:
-                 k2[k] = kw[k].encode('UTF-8')
+                 k2[k] = (kw[k].encode('UTF-8')
+                                if type(kw[k]) == types.StringType else kw[k])
             kw = k2
         url = self._get_url(self.host, path, hash, kw)
 
@@ -551,6 +559,22 @@ class FluidDB:
  
     def get_tag_values_by_about(self, about, tags):
         return [self.get_tag_value_by_about(about, tag) for tag in tags]
+
+    def get_object_tags_by_id(self, id):
+        """Gets the tags on an tag identified by the object's ID.
+ 
+           Returns list of tags.
+        """
+        obj = u'/objects/%s' % self.decode(id)
+        print obj
+        status, (value, value_type) = self._get_tag_value(obj)
+        if status == STATUS.OK:
+            result = json.loads(value)
+            return result[u'tagPaths']
+        else:
+            raise ObjectNotFoundError, u'Couldn\'t find object %s' % obj
+
+    get_object_tags_by_about = by_about(get_tag_value_by_id)
  
     def query(self, query):
         """Runs the query to get the IDs of objects satisfying the query.
@@ -767,7 +791,7 @@ def execute_tag_command(objs, db, tags, options):
                 warning('Failed to tag object %s with %s'
                             % (description, tag.name))
                 warning('Error code %d' % o)
- 
+
  
 def execute_untag_command(objs, db, tags, options):
     actions = {
@@ -834,6 +858,28 @@ def execute_show_command(objs, db, tags, options):
                 print cli_bracket('error code %d getting tag %s' % (status,
                                                                      fulltag))
 
+def execute_tags_command(objs, db, options):
+    actions = {
+        'id': db.get_tag_value_by_id,
+        'about': db.get_tag_value_by_about,
+    }
+    for obj in objs:
+        description = describe_by_mode(obj.specifier, obj.mode)
+        print 'Object %s:' % description
+        id = (db.create_object(obj.specifier).id if obj.mode == 'about'
+              else obj.specifier)
+        for tag in db.get_object_tags_by_id(id):
+            fulltag = db.encode(db.abs_tag_path(tag))
+            status, v = db.get_tag_value_by_id(id, '/%s' % tag)
+ 
+            if status == STATUS.OK:
+                print '  %s' % formatted_tag_value(fulltag, v)
+            elif status == STATUS.NOT_FOUND:
+                print '  %s' % cli_bracket('tag %s not present' % fulltag)
+            else:
+                print cli_bracket('error code %d getting tag %s' % (status,
+                                                                     fulltag))
+
 def execute_http_request(action, args, db, options):
     """Executes a raw HTTP command (GET, PUT, POST, DELETE or HEAD)
        as specified on the command line."""
@@ -868,11 +914,15 @@ def execute_command_line(action, args, options, parser):
     objs = [O({'mode': 'about', 'specifier': a}) for a in options.about] + \
             [O({'mode': 'id', 'specifier': id}) for id in ids]
  
-    if (action.upper() not in HTTP_METHODS + ['COUNT'] and not args):
+    if action == 'help':
+        print USAGE
+        sys.exit(0)
+    elif (action.upper() not in HTTP_METHODS + ['COUNT', 'TAGS'] and not args):
         parser.error('Too few arguments for action %s' % action)
-
     elif action == 'count':
         print "Total: %d objects" % (len(objs))
+    elif action == 'tags':
+        execute_tags_command(objs, db, options)
     elif action in ('tag', 'untag', 'show'):
         if not (options.about or options.query or options.id):
             parser.error('You must use -q, -a or -i with %s' % action)
@@ -880,10 +930,10 @@ def execute_command_line(action, args, options, parser):
         if len(tags) == 0 and action != 'count':
             nothing_to_do()
         actions = {
-                'tag': execute_tag_command,
-                'untag': execute_untag_command,
-                'show': execute_show_command,
-                }
+            'tag': execute_tag_command,
+            'untag': execute_untag_command,
+            'show': execute_show_command,
+        }
         command = actions[action]
  
         command(objs, db, tags, options)
@@ -1301,7 +1351,7 @@ def parse_args(args=None):
     options, args = parser.parse_args(args)
  
     if args == []:
-        action = 'test'
+        action = 'help'
     else:
         action, args = args[0], args[1:]
  
