@@ -50,8 +50,10 @@ def ParseXMLString (xmlString):
     return minidom.parseString (xmlString)
 
 class PageTemplate:
-    def __init__ (self, p):
-        self.COLSPEC = ('<col width="%d%%"/>' % (100/p.cols)) * p.cols
+    def __init__ (self, p, phone):
+        nCols = p.phonecols if phone else p.cols
+        align = 'div' if phone else 'center'
+        self.COLSPEC = ('<col width="%d%%"/>' % (100/nCols)) * nCols
 
         if p.font:
             self.FONT_OPEN = '<font face="%s">' % p.font
@@ -64,36 +66,47 @@ class PageTemplate:
         if p.refreshurl and p.refreshAtBottom:
             self.REFRESH_LINK = '<a href="%s">%s</a>' % (p.refreshurl,
                                                          p.refreshLabel)
-
+        h1title = ('<center><h1><font color="%s">%s</font></h1></center>'
+                    % (p.titleColor,
+                       p.title.encode('utf-8')) if not phone else '')
         self.PAGEHEAD = \
 '''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html>
 <head>
 <title>%s</title>
+<style type="text/css">
+td { padding:  0 6px 0 6px;
+}
+body {
+   font-size: %s%%;
+}
+</style>
 </head>
 <body alink="%s" vlink="%s" link="%s" bgcolor="%s" text="%s">
-<center>
-<h1><font color="%s">%s</font></h1>
 %s
-<table width="100%%" cellpadding="0">
+<%s>
+%s
+<table  cellpadding="0">
 <colgroup>
 %s
 </colgroup>
-''' % (p.title.encode('utf-8'),
+''' % (p.title.encode('utf-8'), "400" if phone else "100",
        p.alink, p.vlink, p.link, p.bgcolor, p.text,
-       p.titleColor, p.title.encode('utf-8'),
+       h1title,
+       align,
        self.FONT_OPEN, self.COLSPEC)
+
 
         self.PAGEFOOT = '''
 </table>
 <br/>
 %s
 %s
-</center>
+</%s>
 </body>
 </html>
-''' % (self.REFRESH_LINK, self.FONT_CLOSE)
+''' % (self.REFRESH_LINK, self.FONT_CLOSE, align)
 
 def Report (s, p):
     if p.verbose:
@@ -203,7 +216,7 @@ def Sort (keys, p):
         for i in range (len (keys)):
             keys[i] = sorted[i]
 
-def BuildPage (home, h, p):
+def BuildPage (home, h, p, phone):
     keys = home.keys ()
     keys.sort ()
 
@@ -220,19 +233,19 @@ def BuildPage (home, h, p):
     keys = home.keys ()
     Sort (keys, p)
     nEntries = len (keys)
-    uneven = nEntries % p.cols > 0
-    nRows = nEntries / p.cols + uneven
-#    print nRows, uneven
+    nCols = p.phonecols if phone else p.cols
+    uneven = nEntries % nCols > 0
+    nRows = nEntries / nCols + uneven
     s = [h.PAGEHEAD]
     for row in range (nRows):
 	s += ['<tr>']
 	if row == nRows - 1:
-	    N = nEntries % p.cols
+	    N = nEntries % nCols
 	else:
-	    N = p.cols
-        count = [0] * p.cols
+	    N = nCols
+        count = [0] * nCols
 	for col in range (N):
-            count[col] = nEntries / p.cols + (nEntries % p.cols > col)
+            count[col] = nEntries / nCols + (nEntries % nCols > col)
 	for col in range (N):
 	    index = sum (count[:col]) + row
             key = keys[index]
@@ -284,9 +297,9 @@ def GetCredentials ():
     return p
     
 
-def RefreshHomepageFromDelicious (useCache=0):
+def RefreshHomepageFromDelicious (useCache=0, phone=False):
     p = GetCredentials ()
-    h = PageTemplate (p)
+    h = PageTemplate (p, phone)
 
     if useCache:
         Report ('Reading entries from cache %s' % p.cache, p)
@@ -294,14 +307,14 @@ def RefreshHomepageFromDelicious (useCache=0):
     else:
         Report ('Reading entries from del.icio.us', p)
         xmlEntries = GetAllDeliciousEntries (p)
-#        xmlEntries = ReadXML ('/Users/njr/python/delicious/delicious.xml')
         Report  ('Writing cache %s' % p.cache, p)
         WriteFileBackupTimestamp (xmlEntries, p.cache, p)
 
     home = GetHomeResults (xmlEntries, p)
-    Report ('Building home page %s' % p.homepage, p)
-    page = BuildPage (home, h, p)
-    WriteFileBackupTimestamp (page, p.homepage, p)
+    homepage = p.phonepage if phone else p.homepage
+    Report ('Building home page %s' % homepage, p)
+    page = BuildPage (home, h, p, phone)
+    WriteFileBackupTimestamp (page, homepage, p)
     Report ('Home page built and backed up', p)
     Report ('Completed OK.', p)
 
@@ -310,6 +323,8 @@ if __name__ == '__main__':
         RefreshHomepageFromDelicious (useCache=False)
     elif len (sys.argv) == 2 and sys.argv[1] == '-c':
         RefreshHomepageFromDelicious (useCache=True)
+    elif len (sys.argv) == 2 and sys.argv[1] == '-p':
+        RefreshHomepageFromDelicious (useCache=True, phone=True)
     elif len (sys.argv) == 2 and sys.argv[1] == '-h':
         Usage (0)
     else:
