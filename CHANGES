@@ -183,5 +183,7 @@
 # 2010/03/30 v1.26      Changed the default action to be help, rather
 #                       than running tests.
 #                       Added tags command.
+# 2010/03/30 v1.27      Removed extra namespace in output from tag above.
+
 
 

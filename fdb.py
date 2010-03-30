@@ -37,7 +37,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.26'
+__version__ = '1.27'
 
 import unittest, os, types, sys, urllib, re
 from functools import wraps
@@ -869,8 +869,8 @@ def execute_tags_command(objs, db, options):
         id = (db.create_object(obj.specifier).id if obj.mode == 'about'
               else obj.specifier)
         for tag in db.get_object_tags_by_id(id):
-            fulltag = db.encode(db.abs_tag_path(tag))
-            status, v = db.get_tag_value_by_id(id, '/%s' % tag)
+            fulltag = '/%s' % tag
+            status, v = db.get_tag_value_by_id(id, fulltag)
  
             if status == STATUS.OK:
                 print '  %s' % formatted_tag_value(fulltag, v)
@@ -878,7 +878,7 @@ def execute_tags_command(objs, db, options):
                 print '  %s' % cli_bracket('tag %s not present' % fulltag)
             else:
                 print cli_bracket('error code %d getting tag %s' % (status,
-                                                                     fulltag))
+                                                                    fulltag))
 
 def execute_http_request(action, args, db, options):
     """Executes a raw HTTP command (GET, PUT, POST, DELETE or HEAD)
