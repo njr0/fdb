@@ -1,26 +1,15 @@
-#
-# deliconfig.py: Configuration file for delicious.py
-#
-# Copyright (c) Nicholas J. Radcliffe 2008-2009
-#
-# See LICENSE for license.
-#
 import os, sys
 
 class Params:
-    homepage = '/Users/njr/Sites/cache/index.html'
+    homepage = '/Users/njr/Sites/intranet/cache/index.html'
                                         # Target homepage location.
                                         # Must be writable by web server
                                         # if CGI script is to be used.
-    phonepage = '/Users/njr/Sites/cache/njrnjr.html'
-                                        # Target homepage location.
-                                        # Must be writable by web server
-                                        # if CGI script is to be used.
-    cache = '/Users/njr/Sites/cache/delicious.xml'
+    cache = '/Users/njr/Sites/intranet/cache/delicious.xml'
                                         # Cache of delicious entries.
                                         # Must be writable by web server
                                         # if CGI script is to be used.
-    credentials = '/Users/njr/.deliciouscredentials.txt'
+    credentials = '/Users/njr/python/delicious/credentials.txt'
                                         # file containing delicious
                                         # username and password
                                         # (on separate lines).
@@ -48,7 +37,6 @@ class Params:
     font="Helvetica,Verdana,Arial"      # Leave blank to use browser default
 
     cols = 4                            # number of columns for output page
-    phonecols = 4                       # number of columns for output page
     tags = 'home'                       # space-separated list of tags to use
     caseSensitive = False               # ignore case in matching tags
                                         # and in sort order for page

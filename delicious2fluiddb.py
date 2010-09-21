@@ -8,7 +8,9 @@
 #
 import types, sys
 import fdb
+#import fdbdummy as fdb
 from delicious import *
+from abouttag.uri import URI
 
 class Entry:
     def __init__ (self, url, description, tags, shared, extended):
@@ -56,30 +58,31 @@ def GetEntryList (p):
     entries = Process (xmlEntries, p)
     return entries 
 
-START_AT = 0
 
 if __name__ == '__main__':
-    p = GetCredentials ()
-    entries = GetEntryList (p)
-    nTotal = len (entries)
+    startAt = 0 if len(sys.argv) < 2 else int(sys.argv[1])
+    p = GetCredentials()
+    entries = GetEntryList(p)
+    nTotal = len(entries)
     entries = [e for e in entries if e.shared == True]
-    nShared = len (entries)
+    nShared = len(entries)
     print 'Removed %d private entries' % (nTotal - nShared)
 
-    db = fdb.FluidDB ()
+    db = fdb.FluidDB()
     nURLs = nTags = 0
-    tagsUsed = set ()
-    for entry in entries[START_AT:]:
+    tagsUsed = set()
+    for i, entry in enumerate(entries[startAt:]):
         if entry.url:
-            print 'Tagging %s:' % entry.url
+            uri = URI(unicode(entry.url)).encode('UTF-8')
+            print '%4d: Tagging %s as %s:' % (i + startAt, entry.url, uri)
             nURLs += 1
         else:
             print 'Blank URL'
-        o = db.create_object (entry.url)
+        o = db.create_object(uri)
         if type (o) == types.IntType:   # error
             print 'Error occurred, code %d' % o
         else:
-            for tag in entry.tags:
+            for tag in [t for t in entry.tags if t]: # no empty tags
                 error = db.tag_object_by_id (o.id, tag)
                 print '   %s' % tag,
                 sys.stdout.flush ()
