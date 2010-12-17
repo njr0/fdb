@@ -10,7 +10,13 @@ import types, sys
 import fdb
 #import fdbdummy as fdb
 from delicious import *
-from abouttag.uri import URI
+try:
+    from abouttag.uri import URI
+except ImportError:
+    print 'You need the abouttag library on your PYTHONPATH.'
+    print 'It is available from https://github.com/njr0/abouttag'
+    raise
+
 
 class Entry:
     def __init__ (self, url, description, tags, shared, extended):

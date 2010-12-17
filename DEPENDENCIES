@@ -1,0 +1,7 @@
+To use delicious2fluiddb.py you need to have the abouttag library on
+your PYTHONPATH.
+
+abouttag is available from 
+
+https://github.com/njr0/abouttag
+
