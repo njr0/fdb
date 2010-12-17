@@ -73,7 +73,7 @@ this stage.   (delicious2fluiddb.py reads from the cache.)
 
 Then, to upload to FluidDB, type
 
-    python delicious.py
+    python delicious2fluiddb.py
 
 
 WHAT IT DOES
