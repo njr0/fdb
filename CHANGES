@@ -184,6 +184,7 @@
 #                       than running tests.
 #                       Added tags command.
 # 2010/03/30 v1.27      Removed extra namespace in output from tag above.
+# 2011/01/33 v1.28	Modified testUntagObjectByID to reflect API changes
 
 
 

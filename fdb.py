@@ -37,7 +37,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.27'
+__version__ = '1.28'
 
 import os
 import re
@@ -1120,7 +1120,13 @@ class TestFluidDB(unittest.TestCase):
 
         # And again, but this time asking for error if untagged
         error = db.untag_object_by_id(self.dadgadID, 'testrating', False)
-        self.assertEqual(error, STATUS.NOT_FOUND)
+        self.assertEqual(error, 0)  # The API has changed so that in fact
+                                    # a 204 (NO CONTENT) is always returned,
+                                    # so this test and the flag are now
+                                    # less meaningful.
+                                    # For now, just updated to be consistent
+                                    # with the latest API.
+                                    
 
     def testUntagObjectByAbout(self):
         db = self.db
