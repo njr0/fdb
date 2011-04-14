@@ -37,7 +37,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.34'
+__version__ = '1.30'
 
 import os
 import re
@@ -224,6 +224,11 @@ class O:
         return '\n'.join(['%20s: %s' % (key, toStr(self.__dict__[key]))
                                 for key in keys])
 
+    def __unicode__(self):
+        keys = self.__dict__.keys()
+        keys.sort()
+        return u'\n'.join([u'%20s: %s' % (key, unicode(self.__dict__[key]))
+                           for key in keys])
 
 class TagValue:
     def __init__(self, name, value=None):

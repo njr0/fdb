@@ -191,6 +191,9 @@
 #                       These new calls are unicode-based; also started adding
 #                       support for a future upgrade to the library to be
 #                       100% unicode.
+# 2011/04/14 v1.30	Added __unicode__ method to class O.
+#                       Corrected version number.
+
 
 
 
