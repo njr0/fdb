@@ -37,7 +37,7 @@
 # rating                                           --- the short tag name
 #
 
-__version__ = '1.28'
+__version__ = '1.34'
 
 import os
 import re
@@ -90,6 +90,9 @@ USAGE = """Run Tests:
    (use POST/PUT/DELETE/HEAD at your peril; currently untested.)
 """ % (DADGAD_ID, DADGAD_ID, DADGAD_ID, DADGAD_ID)
 
+UNICODE = False
+toStr = unicode if UNICODE else str
+
 
 class ProblemReadingCredentialsFileError(Exception):
     pass
@@ -140,6 +143,10 @@ class EmptyNamespaceError(Exception):
 
 
 class UnrecognizedHTTPMethodError(Exception):
+    pass
+
+
+class BadStatusError(Exception):
     pass
 
 
@@ -206,14 +213,15 @@ class O:
 
        Most objects returned natively as hashes by the FluidDB API
        are mapped to these dummy objects in this library."""
-    def __init__(self, hash):
-        for k in hash:
-            self.__dict__[k] = hash[k]
+    def __init__(self, hash=None):
+        if hash:
+            for k in hash:
+                self.__dict__[k] = hash[k]
 
     def __str__(self):
         keys = self.__dict__.keys()
         keys.sort()
-        return '\n'.join(['%20s: %s' % (key, str(self.__dict__[key]))
+        return '\n'.join(['%20s: %s' % (key, toStr(self.__dict__[key]))
                                 for key in keys])
 
 
@@ -224,7 +232,7 @@ class TagValue:
 
     def __str__(self):
         return ('Tag "%s", value "%s" of type %s'
-                     % (self.name, str(self.value), str(type(self.value))))
+                     % (self.name, toStr(self.value), toStr(type(self.value))))
 
 
 class Credentials:
@@ -251,10 +259,10 @@ class Credentials:
                     f.close()
                 except:
                     raise ProblemReadingCredentialsFileError('Failed to read'
-                            ' credentials from %s.' % str(filename))
+                            ' credentials from %s.' % toStr(filename))
             else:
                 raise CredentialsFileNotFoundError('Couldn\'t find or '
-                            'read credentials from %s.' % str(filename))
+                            'read credentials from %s.' % toStr(filename))
 
         self.id = id
 
@@ -286,9 +294,10 @@ class FluidDB:
     def _get_url(self, host, path, hash, kw):
         url = host + urllib.quote(path)
         if hash:
-            url = '%s?%s' % (url, urllib.urlencode(hash))
+            url = '%s?%s' % (url, urllib.urlencode(hash, True))
         elif kw:
-            url = '%s?%s' % (url, urllib.urlencode(kw))
+            url = '%s?%s' % (url, urllib.urlencode(kw, True))
+#        print url
         return self.decode(url)
 
     def set_connection_from_global(self):
@@ -337,7 +346,7 @@ class FluidDB:
         else:
             result = content
         if self.debug:
-            print u'status: %d; content: %s' % (status, str(result))
+            print u'status: %d; content: %s' % (status, toStr(result))
             if status >= 400:
                 for header in response:
                     if header.lower().startswith(u'x-fluiddb-'):
@@ -777,12 +786,12 @@ def get_typed_tag_value(v):
         try:
             r = float(v)
         except ValueError:
-            return str(v)
+            return toStr(v)
         return r
     elif len(v) > 1 and v[0] == v[-1] and v[0] in ('"\''):
         return v[1:-1]
     else:
-        return str(v)
+        return toStr(v)
 
 
 def form_tag_value_pairs(tags):
@@ -882,7 +891,7 @@ def formatted_tag_value(tag, value):
     elif type(value) in types.StringTypes:
         return '%s = "%s"' % (tag, value)
     else:
-        return '%s = %s' % (tag, str(value))
+        return '%s = %s' % (tag, toStr(value))
 
 
 def get_ids_or_fail(query, db):
@@ -971,7 +980,7 @@ def execute_http_request(action, args, db, options):
         hash[pair.name] = pair.value
     status, result = db.call(method, uri, body, hash)
     print 'Status: %d' % status
-    print 'Result: %s' % str(result)
+    print 'Result: %s' % toStr(result)
 
 
 def execute_command_line(action, args, options, parser):
@@ -1030,6 +1039,143 @@ def choose_debug_mode():
 def choose_http_timeout():
     return (options.timeout if 'options' in globals() else HTTP_TIMEOUT)
 
+
+#
+# VALUES API:
+#
+# Note: these calls are different from the rest of fdb.py (at present)
+# in that (1) they used full Fluidinfo paths with no leading slash,
+# and (2) they use unicode throughout (3) tags must exist before being used.
+# Things will be made more consistent over time.
+#
+
+def format_val(s):
+    """
+    Formats a value for json (unicode).
+    """
+    if type(s) == type('s'):
+        raise NonUnicodeStringError
+    elif type(s) == unicode:
+        if s.startswith(u'"') and s.endsswith(u'"'):
+            return s
+        else:
+            return u'"%s"' % s
+    elif type(s) == bool:
+        return unicode(s).lower()
+    else:
+        return unicode(s)
+
+
+def to_typed(v):
+    """
+    Turns json-formatted string into python value.
+    Unicode.
+    """
+    L = v.lower()
+    if v.startswith(u'"') and v.startswith(u'"') and len(v) >= 2:
+        return v[1:-1]
+    elif v.startswith(u"'") and v.startswith(u"'") and len(v) >= 2:
+        return v[1:-1]
+    elif v.lower() == u'true':
+        return True
+    elif v.lower() == u'false':
+        return False
+    elif re.match(INTEGER_RE, v):
+        return int(v)
+    elif re.match(DECIMAL_RE, v) or re.match(DECIMAL_RE2, v):
+        try:
+            r = float(v)
+        except ValueError:
+            return uncode(v)
+        return r
+    else:
+        return unicode(v)
+
+
+def tag_by_query(db, query, tagsToSet):
+    """
+    Sets one or more tags on objects that match a query.
+
+    db         is an instantiated FluidDB instance.
+
+    query      is a unicode string representing a valid Fluidinfo query.
+               e.g. 'has njr/rating'
+
+    tagsToSet  is a dictionary containing tag names (as keys)
+               and values to be set.   (Use None to set a tag with no value.)
+
+    Example:
+
+        db = FluidDB()
+        tag_by_query(db, u'has njr/rating', {'njr/rated': True})
+
+    sets an njr/rated tag to True for every object having an njr/rating.
+
+    NOTE: Unlike in much of the rest of fdb.py, tags need to be full paths
+    without a leading slash.   (This will change.)
+
+    NOTE: Tags must exist before being used.   (This will change.)
+
+    NOTE: All strings must be (and will be) unicode.
+
+
+    """
+    strHash = u'{%s}' % u', '.join(u'"%s": {"value": %s}'
+                                   % (tag, format_val(tagsToSet[tag]))
+                                   for tag in tagsToSet)
+    (v, r) = db.call(u'PUT', u'/values', strHash, {u'query': query})
+    assert_status(v, STATUS.NO_CONTENT)
+
+
+def assert_status(v, s):
+    if not v == s:
+        raise BadStatusError('Bad status %d (expected %d)' % (v, s))
+
+
+def get_values(db, query, tags):
+    """
+    Gets the values of a set of tags satisfying a given query.
+    Returns them as a dictionary (hash) keyed on object ID.
+    The values in the dictionary are simple objects with each tag
+    value in the object's dictionary (__dict__).
+
+    db         is an instantiated FluidDB instance.
+
+    query      is a unicode string representing a valid Fluidinfo query.
+               e.g. 'has njr/rating'
+
+    tags       is a list (or tuple) containing the tags whose values are
+               required.
+
+    Example:
+
+        db = FluidDB()
+        tag_by_query(db, u'has njr/rating < 3', ('fluiddb/about',))
+
+    NOTE: Unlike in much of the rest of fdb.py, tags need to be full paths
+    without a leading slash.   (This will change.)
+
+    NOTE: All strings must be (and will be) unicode.
+
+    """
+    (v, r) = db.call(u'GET', u'/values', None, {u'query': query,
+                                                u'tag': tags})
+    assert_status(v, STATUS.OK)
+    H = r[u'results'][u'id']
+    results = []
+    for id in H:
+        o = O()
+        o.__dict__[u'id'] = id
+        for tag in tags:
+            o.__dict__[tag] = H[id][tag][u'value']
+        results.append(o)
+    return results      # hash of objects, keyed on ID, with attributes
+                        # corresponding to tags, inc id.
+        
+
+#
+# TESTS:
+#
 
 class TestFluidDB(unittest.TestCase):
     db = FluidDB()
@@ -1301,7 +1447,7 @@ class TestCLI(unittest.TestCase):
         sys.stderr = self.stderr
 
     def Print(self, msg):
-        self.stdout.write(str(msg) + '\n')
+        self.stdout.write(toStr(msg) + '\n')
 
     def testOutputManipulation(self):
         print 'one'
