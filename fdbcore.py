@@ -6,7 +6,7 @@
 #               in the AUTHOR
 # Licence terms in LICENCE.
 
-__version__ = '1.31'
+__version__ = '1.33'
 
 import os
 import re
@@ -24,6 +24,7 @@ else:
 
 DADGAD_ID = u'ca0f03b5-3c0d-4c00-aa62-bdb07f29599c'
 UNICODE = False
+DEFAULT_UNIX_STYLE_PATHS = True
 toStr = unicode if UNICODE else str
 
 
@@ -167,6 +168,7 @@ class Credentials:
     the default credentials file will be used, if available.
     """
     def __init__(self, username=None, password=None, id=None, filename=None):
+        self.unixStyle = DEFAULT_UNIX_STYLE_PATHS
         if username and password:
             self.username = username
             self.password = password
@@ -179,6 +181,17 @@ class Credentials:
                     lines = f.readlines()
                     self.username = lines[0].strip()
                     self.password = lines[1].strip()
+                    if len(lines) >= 3:
+                        unixLine = lines[2].strip().lower()
+                        if unixLine.startswith('unix-style-paths'):
+                            if unixLine.endswith('true'):
+                                self.unixStyle = True
+                            elif unixLine.endswith('false'):
+                                self.unixStyle = False
+                            else:
+                                raise ProblemReadingCredentialsFileError(
+                                      'Bad unix-style-paths statement in %s'
+                                      % toStr(filename))
                     f.close()
                 except:
                     raise ProblemReadingCredentialsFileError('Failed to read'
@@ -194,13 +207,22 @@ class FluidDB:
     """
     Connection to FluidDB that remembers credentials and provides
     methods for some of the common operations.
+
+    Although currently unused, the unixStylePaths parameter
+    can be used to choose whether to use unix-style paths for tags,
+    namespaces etc.
     """
 
     def __init__(self, credentials=None, host=None, debug=False,
-                 encoding=DEFAULT_ENCODING):
+                 encoding=DEFAULT_ENCODING, unixStylePaths=None):
         if credentials == None:
             credentials = Credentials()
         self.credentials = credentials
+        if unixStylePaths == None:
+            self.unixStyle = credentials.unixStyle
+        else:
+            assert unixStylePaths in (True, False)
+            self.unixStyle = unixStylePaths
         if host is None:
             host = choose_host()
         self.host = host
@@ -222,7 +244,6 @@ class FluidDB:
             url = '%s?%s' % (url, urllib.urlencode(hash, True))
         elif kw:
             url = '%s?%s' % (url, urllib.urlencode(kw, True))
-#        print url
         return self.decode(url)
 
     def set_connection_from_global(self):
@@ -345,7 +366,7 @@ class FluidDB:
         return O(o) if status == STATUS.CREATED else status
 
     def create_namespace(self, path, description='',
-                          createParentIfNeeded=True, verbose=False):
+                         createParentIfNeeded=True, verbose=False):
         """
         Creates the namespace specified by path using the description
         given.
@@ -368,9 +389,9 @@ class FluidDB:
         an exception is raised.
         """
         fullPath = self.abs_tag_path(path)    # now it starts with /user
-        parts = fullPath.split(u'/')[1:]       # remove '' before leading '/'
+        parts = fullPath.split(u'/')[1:]      # remove '' before leading '/'
         if parts[-1] == u'':
-            parts = parts       # ignore a trailing slash, if there was one
+            parts = parts      # ignore a trailing slash, if there was one
         if len(parts) < 2:     # minimum is 'user' and 'namespace'
             raise EmptyNamespaceError(u'Attempt to create user namespace %s'
                                            % fullPath)
@@ -396,7 +417,7 @@ class FluidDB:
             else:
                 user = parts[-1]
                 raise CannotWriteUserError(u'User %s not found or namespace '
-                                '/%s not writable' % (user, user))
+                                           u'/%s not writable' % (user, user))
         else:
             if verbose:
                 print u'Failed to create namespace %s (%d)' % (fullPath,
@@ -404,7 +425,7 @@ class FluidDB:
             return status
 
     def delete_namespace(self, path, recurse=False, force=False,
-                          verbose=False):
+                         verbose=False):
         """Deletes the namespace specified by path.
 
            The path, as usual in FDB, is considered absolute if it starts
@@ -487,14 +508,15 @@ class FluidDB:
         return 0 if status == STATUS.NO_CONTENT else status
 
     def tag_object_by_id(self, id, tag, value=None, value_type=None,
-                          createAbstractTagIfNeeded=True):
+                         createAbstractTagIfNeeded=True,
+                         inPref=False):
         """Tags the object with the given id with the tag
            given, and the value given, if present.
            If the (abstract) tag with corresponding to the
            tag given doesn't exist, it is created unless
            createAbstractTagIfNeeded is set to False.
         """
-        fullTag = self.abs_tag_path(tag)
+        fullTag = self.abs_tag_path(tag, inPref=inPref)
         objTag = u'/objects/%s%s' % (self.decode(id), fullTag)
 
         (status, o) = self._set_tag_value(objTag, value, value_type)
@@ -509,7 +531,8 @@ class FluidDB:
 
     tag_object_by_about = by_about(tag_object_by_id)
 
-    def untag_object_by_id(self, id, tag, missingConstitutesSuccess=True):
+    def untag_object_by_id(self, id, tag, missingConstitutesSuccess=True,
+                           inPref=False):
         """Removes the tag from the object with id if present.
            If the tag, or the object, doesn't exist,
            the default is that this is considered successful,
@@ -518,7 +541,7 @@ class FluidDB:
 
            Returns 0 for success, non-zero error code otherwise.
         """
-        fullTag = self.abs_tag_path(tag)
+        fullTag = self.abs_tag_path(tag, inPref=inPref)
         objTag = u'/objects/%s%s' % (self.decode(id), fullTag)
         (status, o) = self.call('DELETE', objTag)
         ok = (status == STATUS.NO_CONTENT
@@ -527,7 +550,7 @@ class FluidDB:
 
     untag_object_by_about = by_about(untag_object_by_id)
 
-    def get_tag_value_by_id(self, id, tag):
+    def get_tag_value_by_id(self, id, tag, inPref=False):
         """Gets the value of a tag on an object identified by the
            object's ID.
 
@@ -535,7 +558,7 @@ class FluidDB:
            is the status, and the second is either the tag value,
            if the return stats is STATUS.OK, or None otherwise.
         """
-        fullTag = self.abs_tag_path(tag)
+        fullTag = self.abs_tag_path(tag, inPref=inPref)
         objTag = u'/objects/%s%s' % (self.decode(id), fullTag)
         status, (value, value_type) = self._get_tag_value(objTag)
         if status == STATUS.OK:
@@ -579,39 +602,59 @@ class FluidDB:
         (status, o) = self.call('GET', u'/objects', query=self.decode(query))
         return status if status != STATUS.OK else o[u'ids']
 
-    def abs_tag_path(self, tag):
-        """Returns the absolute path for the tag nominated,
-           in the form
-                /namespace/.../shortTagName
-           If the already tag starts with a '/', no action is taken;
-           if it doesn't, the username from the current credentials
-           is added.
+    def abs_tag_path(self, tag, inPref=False, outPref=False):
+        """
+        Returns the absolute path for the tag nominated,
+        usually in the form
+            /namespace/.../shortTagName
+        If the already tag starts with a '/', no action is taken;
+        if it doesn't, the username from the current credentials
+        is added.
 
-           if /tags/ is present at the start of the path,
-           /tags is stripped off (which might be a problem if there's
-           a user called tags...
+        if /tags/ is present at the start of the path,
+        /tags is stripped off (which might be a problem if there's
+        a user called tags...
 
-           Always returns unicode.
+        Always returns unicode.
 
-           Examples: (assuming the user credentials username is njr):
-                abs_tag_path('rating') = u'/njr/rating'
-                abs_tag_path('/njr/rating') = u'/njr/rating'
-                abs_tag_path('/tags/njr/rating') = u'/njr/rating'
+        Examples: (assuming the user credentials username is njr):
+            abs_tag_path('rating') = u'/njr/rating'
+            abs_tag_path('/njr/rating') = u'/njr/rating'
+            abs_tag_path('/tags/njr/rating') = u'/njr/rating'
 
-                abs_tag_path('foo/rating') = u'/njr/foo/rating'
-                abs_tag_path('/njr/foo/rating') = u'/njr/foo/rating'
-                abs_tag_path('/tags/njr/foo/rating') = u'/njr/foo/rating'
+            abs_tag_path('foo/rating') = u'/njr/foo/rating'
+            abs_tag_path('/njr/foo/rating') = u'/njr/foo/rating'
+            abs_tag_path('/tags/njr/foo/rating') = u'/njr/foo/rating'
+
+        The behaviour is modified if inPref or outPref is set to True.
+
+        Setting inPref to True will change the way the input is handled
+        if the self.unixStyle is False.   In this case, the input will
+        be assume to be a FluidDB-style path already, i.e. it will
+        be assumed to be a full path with no leading slash.
+
+        Setting outPref to True will change the way the input is handled
+        if the self.unixStyle is False.   In this case, the output will
+        not have a leading slash.
         """
         tag = self.decode(tag)
-        if tag == u'/about':     # special case
-            return u'/fluiddb/about'
-        if tag.startswith(u'/'):
-            if tag.startswith(u'/tags/'):
-                return tag[5:]
+        inUnix = self.unixStyle if inPref else True
+        outUnix = self.unixStyle if outPref else True
+        outPrefix = u'/' if outUnix else u''
+        if inUnix:
+            if tag == u'/about':     # special case
+                return u'%sfluiddb/about' % outPrefix
+            if tag.startswith(u'/'):
+                if tag.startswith(u'/tags/'):
+                    return u'%s%s' % (outPrefix, tag[6:])
+                else:
+                    return u'%s%s' % (outPrefix, tag[1:])
             else:
-                return tag
+                return u'%s%s/%s' % (outPrefix,
+                                     self.decode(self.credentials.username),
+                                     tag)
         else:
-            return u'/%s/%s' % (self.decode(self.credentials.username), tag)
+            return u'%s%s' % (outPrefix, tag)
 
     def full_tag_path(self, tag):
         """Returns the absolute tag path (see above), prefixed with /tag.

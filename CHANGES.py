@@ -195,4 +195,13 @@
 #                       Corrected version number.
 # 2011/04/14 v1.31      Split into modules fdb.py, testfdb.py, cli.py,
 #                       and fdbcore.py
+# 2011/04/14 v1.32      Added support for switching between unix-style
+#                       paths and Fluidinfo-style paths.   This can be
+#                       controlled by a line in the credentials file
+#                       or with command line flags (-F/-U).
+#                       See help and README for details.
+# 2011/04/14 v1.33      Made help sensitive to path config/flags.
+
+
+
 

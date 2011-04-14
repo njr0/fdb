@@ -13,6 +13,7 @@ from itertools import chain, imap
 from fdbcore import (
     FluidDB,
     O,
+    Credentials,
     get_typed_tag_value,
     toStr,
     STATUS,
@@ -25,11 +26,7 @@ from fdbcore import (
 
 HTTP_METHODS = ['GET', 'PUT', 'POST', 'DELETE', 'HEAD']
 
-USAGE = """Run Tests:
-   fdb test            (runs all tests)
-   fdb testcli         (tests command line interface only)
-   fdb testdb          (tests core FluidDB interface only)
-   fdb testutil        (runs tests not requiring FluidDB access)
+USAGE = """
 
  Tag objects:
    fdb tag -a 'DADGAD' tuning rating=10
@@ -53,10 +50,55 @@ USAGE = """Run Tests:
    fdb tags -a 'DADGAD'
    fdb tags -i %s
 
+Run Tests:
+   fdb test            (runs all tests)
+   fdb testcli         (tests command line interface only)
+   fdb testdb          (tests core FluidDB interface only)
+   fdb testutil        (runs tests not requiring FluidDB access)
+
  Raw HTTP GET:
    fdb get /tags/njr/google
    fdb get /permissions/tags/njr/rating action=delete
    (use POST/PUT/DELETE/HEAD at your peril; currently untested.)
+
+""" % (DADGAD_ID, DADGAD_ID, DADGAD_ID, DADGAD_ID)
+
+
+USAGE_FI = """
+
+ Tag objects:
+   fdb tag -a 'DADGAD' njr/tuning njr/rating=10
+   fdb tag -i %s njr/tuning njr/rating=10
+   fdb tag -q 'about = "DADGAD"' tuning njr/rating=10
+
+ Untag objects:
+   fdb untag -a 'DADGAD' njr/tuning njr/rating
+   fdb untag -i %s
+   fdb untag -q 'about = "DADGAD"' njr/tuning njr/rating
+
+ Fetch objects and show tags
+   fdb show -a 'DADGAD' njr/tuning njr/rating
+   fdb show -i %s njr/tuning njr/rating
+   fdb show -q 'about = "DADGAD"' njr/tuning njr/rating
+
+ Count objects matching query:
+   fdb count -q 'has fluiddb/users/username'
+
+ Get tags on objects and their values:
+   fdb tags -a 'DADGAD'
+   fdb tags -i %s
+
+Run Tests:
+   fdb test            (runs all tests)
+   fdb testcli         (tests command line interface only)
+   fdb testdb          (tests core FluidDB interface only)
+   fdb testutil        (runs tests not requiring FluidDB access)
+
+ Raw HTTP GET:
+   fdb get /tags/njr/google
+   fdb get /permissions/tags/njr/rating action=delete
+   (use POST/PUT/DELETE/HEAD at your peril; currently untested.)
+
 """ % (DADGAD_ID, DADGAD_ID, DADGAD_ID, DADGAD_ID)
 
 
@@ -91,7 +133,8 @@ def execute_tag_command(objs, db, tags, options):
     for obj in objs:
         description = describe_by_mode(obj.specifier, obj.mode)
         for tag in tags:
-            o = actions[obj.mode](obj.specifier, tag.name, tag.value)
+            o = actions[obj.mode](obj.specifier, tag.name, tag.value,
+                                  inPref=True)
             if o == 0:
                 if options.verbose:
                     print('Tagged object %s with %s'
@@ -111,7 +154,7 @@ def execute_untag_command(objs, db, tags, options):
     for obj in objs:
         description = describe_by_mode(obj.specifier, obj.mode)
         for tag in tags:
-            o = actions[obj.mode](obj.specifier, tag)
+            o = actions[obj.mode](obj.specifier, tag, inPref=True)
             if o == 0:
                 if options.verbose:
                     print('Removed tag %s from object %s\n'
@@ -132,7 +175,8 @@ def execute_show_command(objs, db, tags, options):
         print 'Object %s:' % description
 
         for tag in tags:
-            fulltag = db.encode(db.abs_tag_path(tag))
+            fulltag = db.encode(db.abs_tag_path(tag, inPref=True))
+            outtag = db.encode(db.abs_tag_path(tag, inPref=True, outPref=True))
             if tag == '/id':
                 if obj.mode == 'about':
                     o = db.query('fluiddb/about = "%s"' % obj.specifier)
@@ -143,15 +187,15 @@ def execute_show_command(objs, db, tags, options):
                 else:
                     status, v = STATUS.OK, obj.specifier
             else:
-                status, v = actions[obj.mode](obj.specifier, tag)
+                status, v = actions[obj.mode](obj.specifier, tag, inPref=True)
 
             if status == STATUS.OK:
-                print '  %s' % formatted_tag_value(fulltag, v)
+                print '  %s' % formatted_tag_value(outtag, v)
             elif status == STATUS.NOT_FOUND:
-                print '  %s' % cli_bracket('tag %s not present' % fulltag)
+                print '  %s' % cli_bracket('tag %s not present' % outtag)
             else:
                 print cli_bracket('error code %d getting tag %s' % (status,
-                                                                    fulltag))
+                                                                    outtag))
 
 
 def execute_tags_command(objs, db, options):
@@ -162,15 +206,16 @@ def execute_tags_command(objs, db, options):
               else obj.specifier)
         for tag in db.get_object_tags_by_id(id):
             fulltag = '/%s' % tag
+            outtag = '/%s' % tag if db.unixStyle else tag
             status, v = db.get_tag_value_by_id(id, fulltag)
 
             if status == STATUS.OK:
-                print '  %s' % formatted_tag_value(fulltag, v)
+                print '  %s' % formatted_tag_value(outtag, v)
             elif status == STATUS.NOT_FOUND:
-                print '  %s' % cli_bracket('tag %s not present' % fulltag)
+                print '  %s' % cli_bracket('tag %s not present' % outtag)
             else:
                 print cli_bracket('error code %d getting tag %s' % (status,
-                                                                    fulltag))
+                                                                    outtag))
 
 
 def execute_http_request(action, args, db, options):
@@ -196,45 +241,6 @@ def execute_http_request(action, args, db, options):
     status, result = db.call(method, uri, body, hash)
     print 'Status: %d' % status
     print 'Result: %s' % toStr(result)
-
-
-def execute_command_line(action, args, options, parser):
-    db = FluidDB(host=options.hostname, debug=options.debug)
-
-    ids_from_queries = chain(*imap(lambda q: get_ids_or_fail(q, db),
-        options.query))
-    ids = chain(options.id, ids_from_queries)
-
-    objs = [O({'mode': 'about', 'specifier': a}) for a in options.about] + \
-            [O({'mode': 'id', 'specifier': id}) for id in ids]
-
-    if action == 'help':
-        print USAGE
-        sys.exit(0)
-    elif (action.upper() not in HTTP_METHODS + ['COUNT', 'TAGS'] and not args):
-        parser.error('Too few arguments for action %s' % action)
-    elif action == 'count':
-        print "Total: %d objects" % (len(objs))
-    elif action == 'tags':
-        execute_tags_command(objs, db, options)
-    elif action in ('tag', 'untag', 'show'):
-        if not (options.about or options.query or options.id):
-            parser.error('You must use -q, -a or -i with %s' % action)
-        tags = args
-        if len(tags) == 0 and action != 'count':
-            nothing_to_do()
-        actions = {
-            'tag': execute_tag_command,
-            'untag': execute_untag_command,
-            'show': execute_show_command,
-        }
-        command = actions[action]
-
-        command(objs, db, tags, options)
-    elif action in ['get', 'put', 'post', 'delete']:
-        execute_http_request(action, args, db, options)
-    else:
-        parser.error('Unrecognized command %s' % action)
 
 
 def describe_by_mode(specifier, mode):
@@ -334,7 +340,11 @@ def plural(n, s, pl=None, str=False, justTheWord=False):
 def parse_args(args=None):
     if args is None:
         args = sys.argv[1:]
-    parser = OptionParser(usage=USAGE)
+    if Credentials().unixStyle:
+        usage = USAGE_FI if '-F' in args else USAGE
+    else:
+        usage = USAGE if '-U' in args else USAGE_FI
+    parser = OptionParser(usage=usage)
     general = OptionGroup(parser, "General options")
     general.add_option("-a", "--about", action="append", default=[],
             help="used to specify objects by about tag")
@@ -348,6 +358,12 @@ def parse_args(args=None):
             help="enables debug mode (more output)")
     general.add_option("-T", "--timeout", type="float", default=HTTP_TIMEOUT,
             metavar="n", help="sets the HTTP timeout to n seconds")
+    general.add_option("-U", "--unixstylepaths", action="store_true",
+                       default=False,
+            help="Forces unix-style paths for tags and namespaces.")
+    general.add_option("-F", "--fluidinfostylepaths", action="store_true",
+                       default=False,
+            help="Forces Fluidinfo--style paths for tags and namespaces.")
     parser.add_option_group(general)
 
     other = OptionGroup(parser, "Other flags")
@@ -370,3 +386,47 @@ def parse_args(args=None):
     return action, args, options, parser
 
 
+def execute_command_line(action, args, options, parser):
+    if options.unixstylepaths:
+        unixStyle = True
+    elif options.fluidinfostylepaths:
+        unixStyle = False
+    else:
+        unixStyle=None
+    db = FluidDB(host=options.hostname, debug=options.debug,
+                 unixStylePaths=unixStyle)
+
+    ids_from_queries = chain(*imap(lambda q: get_ids_or_fail(q, db),
+        options.query))
+    ids = chain(options.id, ids_from_queries)
+
+    objs = [O({'mode': 'about', 'specifier': a}) for a in options.about] + \
+            [O({'mode': 'id', 'specifier': id}) for id in ids]
+
+    if action == 'help':
+        print USAGE if db.unixStyle else USAGE_FI
+        sys.exit(0)
+    elif (action.upper() not in HTTP_METHODS + ['COUNT', 'TAGS'] and not args):
+        parser.error('Too few arguments for action %s' % action)
+    elif action == 'count':
+        print "Total: %d objects" % (len(objs))
+    elif action == 'tags':
+        execute_tags_command(objs, db, options)
+    elif action in ('tag', 'untag', 'show'):
+        if not (options.about or options.query or options.id):
+            parser.error('You must use -q, -a or -i with %s' % action)
+        tags = args
+        if len(tags) == 0 and action != 'count':
+            nothing_to_do()
+        actions = {
+            'tag': execute_tag_command,
+            'untag': execute_untag_command,
+            'show': execute_show_command,
+        }
+        command = actions[action]
+
+        command(objs, db, tags, options)
+    elif action in ['get', 'put', 'post', 'delete']:
+        execute_http_request(action, args, db, options)
+    else:
+        parser.error('Unrecognized command %s' % action)

@@ -40,6 +40,31 @@ On Unix, the default location for this is ~/.fluidDBcredentials,
 and on Windows the default file is fluidDBcredentials.ini in your
 home folder.
 
+You can also optionally add a line, after password, saying either
+
+unix-style-paths true
+or unix-style-paths false
+
+(see TAG PATHS:)
+
+
+CONVENTIONS
+===========
+
+If nothing overrides this, fdb uses unix-style paths, meaning that paths
+are assumed to be relative to the user's namespace unless they are
+introduced with a leading slash.   Also, the about tag (fluiddb/about)
+may be referred to as /about.   This affects input and output.
+
+If you prefer using absolute Fluidinfo-style paths all the time
+(i.e. you always specify the namespace and don't use a leading slash)
+you can tell fdb to respect this either by setting
+
+unix-style-paths false
+
+in your credentials file (see above) or by using the -F option on
+command-line commands.
+
 
 TESTS
 =====
