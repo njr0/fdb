@@ -184,18 +184,15 @@
 #                       than running tests.
 #                       Added tags command.
 # 2010/03/30 v1.27      Removed extra namespace in output from tag above.
-# 2011/01/33 v1.28	Modified testUntagObjectByID to reflect API changes
-# 2011/01/34 v1.29	Added first stage of support for /values API.
+# 2011/01/33 v1.28      Modified testUntagObjectByID to reflect API changes
+# 2011/01/34 v1.29      Added first stage of support for /values API.
 #                       Currently this is just a few functions to let this
 #                       be used programatically.
 #                       These new calls are unicode-based; also started adding
 #                       support for a future upgrade to the library to be
 #                       100% unicode.
-# 2011/04/14 v1.30	Added __unicode__ method to class O.
+# 2011/04/14 v1.30      Added __unicode__ method to class O.
 #                       Corrected version number.
-
-
-
-
-
+# 2011/04/14 v1.31      Split into modules fdb.py, testfdb.py, cli.py,
+#                       and fdbcore.py
 
