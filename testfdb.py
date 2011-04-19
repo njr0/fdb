@@ -7,7 +7,7 @@
 # Licence terms in LICENCE.
 #
 import unittest
-from fdbcore import *
+from fdblib import *
 from cli import *
 
 class TestFluidDB(unittest.TestCase):

@@ -10,7 +10,7 @@ import sys
 import types
 from optparse import OptionParser, OptionGroup
 from itertools import chain, imap
-from fdbcore import (
+from fdblib import (
     FluidDB,
     O,
     Credentials,
