@@ -37,7 +37,7 @@ user has username ``njr``.
 
          $ fdb tag -a "Eiffel Tower" rating=9
 
-  2. Show the my rating and @ntoll's rating of the "Eiffel Tower".
+  2. Show the my rating and ntoll's rating of the "Eiffel Tower".
      ::
 
         $ fdb show -a "Eiffel Tower"  /about  rating  /ntoll/rating 
@@ -174,7 +174,7 @@ in and usually takes on of three forms:
 
   * ``-a "about tag value"`` is used to specify an object on the basis of
     its about tag.   For example,
-    ``-a "book:nineteen eighty four (george orwell)" specifies an important
+    ``-a "book:nineteen eighty four (george orwell)"`` specifies an important
     book by George Orwell.
 
   * ``-i ID`` is used to specify an object on the basis of its
@@ -205,8 +205,12 @@ so that a list of them might be
 
     rating=9 description="fabulous" seen=true price = 18.77
 
-In general, strings should be in quotes, booleans should be true, false, t
-or f (unquoted) and numbers should just be plain numbers.
+(fdb is not too fussy about whether you put spaces around equals signs
+or not.)
+
+In general, strings should be in double quotes, booleans should be ``true``,
+``false``, ``t`` or ``f`` (unquoted) and numbers should just be plain numbers
+like 3 or 4.7.
 
 It is also possible to set a tag without a value by just giving a tag name.
 
