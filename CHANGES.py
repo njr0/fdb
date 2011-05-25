@@ -201,6 +201,12 @@
 #                       or with command line flags (-F/-U).
 #                       See help and README for details.
 # 2011/04/14 v1.33      Made help sensitive to path config/flags.
+#
+# 2011/05/26 v2.00      Switched to use Fluidinfo-style paths by default.
+#                       Fixed bug affecting some unicode characters in queries.
+#                       Added --version/-V flag to report version
+
+
 
 
 

@@ -6,7 +6,7 @@
 #               in the AUTHOR
 # Licence terms in LICENCE.
 
-__version__ = '1.33'
+__version__ = '2.00'
 
 import os
 import re
@@ -24,7 +24,7 @@ else:
 
 DADGAD_ID = u'ca0f03b5-3c0d-4c00-aa62-bdb07f29599c'
 UNICODE = False
-DEFAULT_UNIX_STYLE_PATHS = True
+DEFAULT_UNIX_STYLE_PATHS = False
 toStr = unicode if UNICODE else str
 
 
@@ -243,7 +243,11 @@ class FluidDB:
         if hash:
             url = '%s?%s' % (url, urllib.urlencode(hash, True))
         elif kw:
-            url = '%s?%s' % (url, urllib.urlencode(kw, True))
+            kwds = '&'.join('%s=%s' % (k.encode('UTF-8'),
+                            urllib.quote(kw[k].encode('UTF-8'))) for k in kw)
+
+            url = '%s?%s' % (url, kwds)
+            
         return self.decode(url)
 
     def set_connection_from_global(self):
@@ -275,7 +279,7 @@ class FluidDB:
         if True:
             k2 = {}
             for k in kw:
-                k2[k] = (kw[k].encode('UTF-8')
+                k2[k] = (kw[k].decode('UTF-8')
                          if type(kw[k]) == types.StringType else kw[k])
             kw = k2
         url = self._get_url(self.host, path, hash, kw)
@@ -922,3 +926,5 @@ def get_values(db, query, tags):
                         # corresponding to tags, inc id.
         
 
+def version():
+    return __version__

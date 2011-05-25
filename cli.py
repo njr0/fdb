@@ -16,6 +16,7 @@ from fdblib import (
     Credentials,
     get_typed_tag_value,
     toStr,
+    version,
     STATUS,
     DADGAD_ID,
     HTTP_TIMEOUT,
@@ -364,6 +365,9 @@ def parse_args(args=None):
     general.add_option("-F", "--fluidinfostylepaths", action="store_true",
                        default=False,
             help="Forces Fluidinfo--style paths for tags and namespaces.")
+    general.add_option("-V", "--version", action="store_true",
+                       default=False,
+            help="Report version number.")
     parser.add_option_group(general)
 
     other = OptionGroup(parser, "Other flags")
@@ -379,7 +383,7 @@ def parse_args(args=None):
     options, args = parser.parse_args(args)
 
     if args == []:
-        action = 'help'
+        action = 'version' if options.version else 'help' 
     else:
         action, args = args[0], args[1:]
 
@@ -403,6 +407,10 @@ def execute_command_line(action, args, options, parser):
     objs = [O({'mode': 'about', 'specifier': a}) for a in options.about] + \
             [O({'mode': 'id', 'specifier': id}) for id in ids]
 
+    if options.version:
+        print 'fdb %s' % version()
+        if action == 'version':
+            sys.exit(0)
     if action == 'help':
         print USAGE if db.unixStyle else USAGE_FI
         sys.exit(0)

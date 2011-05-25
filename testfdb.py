@@ -295,7 +295,7 @@ class TestCLI(unittest.TestCase):
         description = describe_by_mode(spec, mode)
         flags = ['-v', flag] if verbose else [flag]
         hostname = ['--hostname', choose_host()]
-        args = ['tag'] + flags + [spec, 'rating=10'] + hostname
+        args = ['tag'] + ['-U'] + flags + [spec, 'rating=10'] + hostname
         execute_command_line(*parse_args(args))
         self.reset()
         if verbose:
@@ -314,7 +314,7 @@ class TestCLI(unittest.TestCase):
         description = describe_by_mode(spec, mode)
         flags = ['-v', flag] if verbose else [flag]
         hostname = ['--hostname', choose_host()]
-        args = ['untag'] + flags + [spec, 'rating'] + hostname
+        args = ['untag'] + ['-U'] + flags + [spec, 'rating'] + hostname
         execute_command_line(*parse_args(args))
         self.reset()
         if verbose:
@@ -330,7 +330,7 @@ class TestCLI(unittest.TestCase):
         (flag, spec) = specify_DADGAD(mode, self.db.host)
         description = describe_by_mode(spec, mode)
         hostname = ['--hostname', choose_host()]
-        args = (['show', '-v', flag, spec, 'rating', '/fluiddb/about']
+        args = (['show', '-U', '-v', flag, spec, 'rating', '/fluiddb/about']
                 + hostname)
         execute_command_line(*parse_args(args))
         self.reset()
@@ -345,7 +345,7 @@ class TestCLI(unittest.TestCase):
         (flag, spec) = specify_DADGAD(mode, self.db.host)
         description = describe_by_mode(spec, mode)
         hostname = ['--hostname', choose_host()]
-        args = (['show', '-v', flag, spec, 'rating', '/fluiddb/about']
+        args = (['show', '-U', '-v', flag, spec, 'rating', '/fluiddb/about']
                  + hostname)
         execute_command_line(*parse_args(args))
         self.reset()

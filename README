@@ -1,3 +1,5 @@
+** IMPORTANT CHANGE IN VERSION 2.00: SEE TAG CONVENTIONS **
+
 FDB PYTHON LIBRARY
 ==================
 
@@ -45,25 +47,32 @@ You can also optionally add a line, after password, saying either
 unix-style-paths true
 or unix-style-paths false
 
-(see TAG PATHS:)
 
+TAG CONVENTIONS
+===============
 
-CONVENTIONS
-===========
-
-If nothing overrides this, fdb uses unix-style paths, meaning that paths
-are assumed to be relative to the user's namespace unless they are
-introduced with a leading slash.   Also, the about tag (fluiddb/about)
-may be referred to as /about.   This affects input and output.
-
-If you prefer using absolute Fluidinfo-style paths all the time
-(i.e. you always specify the namespace and don't use a leading slash)
-you can tell fdb to respect this either by setting
+As from version 2.00, fdb uses absolute Fluidinfo-style paths all the time
+(i.e. you always specify the namespace and don't use a leading slash).
+You can explicitly mandate this also by adding the line
 
 unix-style-paths false
 
-in your credentials file (see above) or by using the -F option on
-command-line commands.
+in your credentials file (see above).
+
+If you instead set 
+
+unix-style-paths true
+
+on the third line of the credentials file, fdb uses unix-style paths,
+meaning that paths are assumed to be relative to the user's namespace
+unless they are introduced with a leading slash.  Also, the about tag
+(fluiddb/about) may be referred to as /about.  This affects input and
+output.
+
+If you want to overrride this behaviour for a given command,
+you can use the -U flag to specify that the command will use
+unix-style paths, or -F to indicate that it will use fluidinfo-style
+paths.
 
 
 TESTS
