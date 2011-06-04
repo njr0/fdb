@@ -6,6 +6,7 @@
 #               in the AUTHOR
 # Licence terms in LICENCE.
 
+import shutil
 import sys
 import types
 from optparse import OptionParser, OptionGroup
@@ -14,18 +15,24 @@ from fdblib import (
     FluidDB,
     O,
     Credentials,
+    get_credentials_file,
     get_typed_tag_value,
+    path_style,
     toStr,
     version,
+    DEFAULT_ENCODING,
     STATUS,
     DADGAD_ID,
     HTTP_TIMEOUT,
     SANDBOX_PATH,
     FLUIDDB_PATH,
 )
+import ls
 
 
 HTTP_METHODS = ['GET', 'PUT', 'POST', 'DELETE', 'HEAD']
+
+ARGLESS_COMMANDS = ['COUNT', 'TAGS', 'LS', 'PWD', 'PWN', 'WHOAMI']
 
 USAGE = """
 
@@ -51,11 +58,16 @@ USAGE = """
    fdb tags -a 'DADGAD'
    fdb tags -i %s
 
-Run Tests:
-   fdb test            (runs all tests)
-   fdb testcli         (tests command line interface only)
-   fdb testdb          (tests core FluidDB interface only)
-   fdb testutil        (runs tests not requiring FluidDB access)
+ Miscellaneous:
+   fdb whoami              prints username for authenticated user
+   fdb pwd / fdb pwn       prints root namespace of authenticated user
+   fdb su fdbuser          set fdb to use user credentials for fdbuser
+
+ Run Tests:
+   fdb test                runs all tests
+   fdb testcli             tests command line interface only
+   fdb testdb              tests core FluidDB interface only
+   fdb testutil            runs tests not requiring FluidDB access
 
  Raw HTTP GET:
    fdb get /tags/njr/google
@@ -89,7 +101,7 @@ USAGE_FI = """
    fdb tags -a 'DADGAD'
    fdb tags -i %s
 
-Run Tests:
+ Run Tests:
    fdb test            (runs all tests)
    fdb testcli         (tests command line interface only)
    fdb testdb          (tests core FluidDB interface only)
@@ -218,6 +230,18 @@ def execute_tags_command(objs, db, options):
                 print cli_bracket('error code %d getting tag %s' % (status,
                                                                     outtag))
 
+def execute_whoami_command(db):
+    print db.credentials.username
+
+
+def execute_su_command(db, args):
+    source =  get_credentials_file(username=args[0])
+    dest = get_credentials_file()
+    shutil.copyfile(source, dest)
+    db = FluidDB(Credentials(filename=dest))
+    username = db.credentials.username
+    extra = u'' if args[0] == username else (u' (file %s)' % args[0])
+    print u'Credentials set to user %s%s.' % (username, extra)
 
 def execute_http_request(action, args, db, options):
     """Executes a raw HTTP command (GET, PUT, POST, DELETE or HEAD)
@@ -338,6 +362,7 @@ def plural(n, s, pl=None, str=False, justTheWord=False):
             return ('%s %s%s' % (strNum, s, pl))
 
 
+
 def parse_args(args=None):
     if args is None:
         args = sys.argv[1:]
@@ -362,12 +387,27 @@ def parse_args(args=None):
     general.add_option("-U", "--unixstylepaths", action="store_true",
                        default=False,
             help="Forces unix-style paths for tags and namespaces.")
+    general.add_option("-u", "--user", action="append", default=[],
+            help="used to specify a different user (credentials file)")
     general.add_option("-F", "--fluidinfostylepaths", action="store_true",
                        default=False,
             help="Forces Fluidinfo--style paths for tags and namespaces.")
     general.add_option("-V", "--version", action="store_true",
                        default=False,
             help="Report version number.")
+    general.add_option("-R", "--recurse", action="store_true",
+                       default=False,
+            help="recursive (for ls and rm).")
+    general.add_option("-l", "--long", action="store_true",
+                       default=False,
+            help="long listing (for ls).")
+    general.add_option("-L", "--longer", action="store_true",
+                       default=False,
+            help="longer listing (for ls).")
+    general.add_option("-d", "--namespace", action="store_true",
+                       default=False,
+            help="don't list namespace; just name of namespace.")
+
     parser.add_option_group(general)
 
     other = OptionGroup(parser, "Other flags")
@@ -391,15 +431,10 @@ def parse_args(args=None):
 
 
 def execute_command_line(action, args, options, parser):
-    if options.unixstylepaths:
-        unixStyle = True
-    elif options.fluidinfostylepaths:
-        unixStyle = False
-    else:
-        unixStyle=None
-    db = FluidDB(host=options.hostname, debug=options.debug,
-                 unixStylePaths=unixStyle)
-
+    if not action == 'ls':
+        credentials = Credentials(options.user[0]) if options.user else None
+        db = FluidDB(host=options.hostname, credentials=credentials,
+                     debug=options.debug, unixStylePaths=path_style(options))
     ids_from_queries = chain(*imap(lambda q: get_ids_or_fail(q, db),
         options.query))
     ids = chain(options.id, ids_from_queries)
@@ -414,7 +449,8 @@ def execute_command_line(action, args, options, parser):
     if action == 'help':
         print USAGE if db.unixStyle else USAGE_FI
         sys.exit(0)
-    elif (action.upper() not in HTTP_METHODS + ['COUNT', 'TAGS'] and not args):
+    elif (action.upper() not in HTTP_METHODS + ARGLESS_COMMANDS
+          and not args):
         parser.error('Too few arguments for action %s' % action)
     elif action == 'count':
         print "Total: %d objects" % (len(objs))
@@ -433,7 +469,13 @@ def execute_command_line(action, args, options, parser):
         }
         command = actions[action]
 
-        command(objs, db, tags, options)
+        command(objs, db, args, options)
+    elif action == 'ls':
+        ls.execute_ls_command(objs, args, options)
+    elif action in ('pwd', 'pwn', 'whoami'):
+        execute_whoami_command(db)
+    elif action == 'su':
+        execute_su_command(db, args)
     elif action in ['get', 'put', 'post', 'delete']:
         execute_http_request(action, args, db, options)
     else:

@@ -6,7 +6,7 @@
 #               in the AUTHOR
 # Licence terms in LICENCE.
 
-__version__ = '2.00'
+__version__ = '2.01'
 
 import os
 import re
@@ -101,7 +101,9 @@ DECIMAL_RE2 = re.compile(r'^[+\-]{0,1}[\.\,]{1}[0-9]+$')
 IDS_MAIN = {u'DADGAD': u'1fb8e9cb-70b9-4bd0-a7e7-880247384abd'}
 IDS_SAND = {u'DADGAD': DADGAD_ID}
 
-DEFAULT_ENCODING = 'UTF-8'
+#DEFAULT_ENCODING = 'UTF-8'
+
+DEFAULT_ENCODING = sys.getfilesystemencoding()
 
 
 def id(about, host):
@@ -203,6 +205,10 @@ class Credentials:
         self.id = id
 
 
+def format_param(v):
+    return urllib.quote(v.encode('UTF-8')) if type(v) == unicode else str(v)
+
+
 class FluidDB:
     """
     Connection to FluidDB that remembers credentials and provides
@@ -244,7 +250,7 @@ class FluidDB:
             url = '%s?%s' % (url, urllib.urlencode(hash, True))
         elif kw:
             kwds = '&'.join('%s=%s' % (k.encode('UTF-8'),
-                            urllib.quote(kw[k].encode('UTF-8'))) for k in kw)
+                                       format_param(kw[k])) for k in kw)
 
             url = '%s?%s' % (url, kwds)
             
@@ -718,6 +724,14 @@ class FluidDB:
             subnamespace = u'/'.join(parts[2:-1])
         return (user, subnamespace, tagname)
 
+    def tag_exists(self, tag):
+        (status, o) = self.call('GET', u'/tags' + self.abs_tag_path(tag))
+        return status == 200
+        
+    def ns_exists(self, ns):
+        (status, o) = self.call('GET', u'/namespaces' + self.abs_tag_path(ns))
+        return status == 200
+
 
 def object_uri(id):
     """Returns the full URI for the FluidDB object with the given id."""
@@ -925,6 +939,16 @@ def get_values(db, query, tags):
     return results      # hash of objects, keyed on ID, with attributes
                         # corresponding to tags, inc id.
         
+
+def path_style(options):
+    if options.unixstylepaths:
+        unixStyle = True
+    elif options.fluidinfostylepaths:
+        unixStyle = False
+    else:
+        unixStyle=None
+    return unixStyle
+
 
 def version():
     return __version__

@@ -205,6 +205,16 @@
 # 2011/05/26 v2.00      Switched to use Fluidinfo-style paths by default.
 #                       Fixed bug affecting some unicode characters in queries.
 #                       Added --version/-V flag to report version
+#
+# 2011/06/04 v2.01      Added pwd/pwn, whoami and su commands.
+#                       Added embryonic ls command (including embryonic
+#                       ls -l).
+#                       Added -u option to allow a user to be specified.
+#                       Improved handling of encoding to use
+#                       sys.getfilesystemencoding() rather than assuming
+#                       UTF-8, at least in some places, but this transition
+#                       is incomplete.
+
 
 
 
