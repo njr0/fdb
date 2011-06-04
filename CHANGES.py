@@ -218,6 +218,26 @@
 # 2011/06/04 v2.02      Fixed encodings so that unicode usernames
 #                       and passwords work.
 #                       Credentials file must be encoded in UTF-8.
+#
+# 2011/06/04 v2.03      More complete unicode improvements.
+#                       To a very good approximation, it is now true that
+#                          - All strings are stored internally as unicode
+#                          - Keyboard input is read correctly using the
+#                            encoding specified by sys.getfilesystemencoding()
+#                          - Data is UTF-8-encoded just before transmitting
+#                            to Fluidinfo
+#                          - Data is decode from UTF-8 immediately upon
+#                            receipt from Fluidinfo.
+#                      Not all the test data has yet been upgraded this way
+#                      and there is still far too little unicode data in
+#                      the tests.
+#
+#                      At the time of this commit, lots of things are
+#                      not working with unicode namespaces, but that appears
+#                      to be a problem with the main instance; similar
+#                      things are working on the Sandbox.
+
+
 
 
 

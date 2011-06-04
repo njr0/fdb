@@ -198,35 +198,35 @@ class TestFDBUtilityFunctions(unittest.TestCase):
 
     def testTypedValueInterpretation(self):
         corrects = {
-                'TRUE': (True, types.BooleanType),
-                'tRuE': (True, types.BooleanType),
-                't': (True, types.BooleanType),
-                'T': (True, types.BooleanType),
-                'f': (False, types.BooleanType),
-                'false': (False, types.BooleanType),
-                '1': (1, types.IntType),
-                '+1': (1, types.IntType),
-                '-1': (-1, types.IntType),
-                '0': (0, types.IntType),
-                '+0': (0, types.IntType),
-                '-0': (0, types.IntType),
-                '123456789': (123456789, types.IntType),
-                '-987654321': (-987654321, types.IntType),
-                '011': (11, types.IntType),
-                '-011': (-11, types.IntType),
-                '3.14159': (float("3.14159"), types.FloatType),
-                '-3.14159': (float("-3.14159"), types.FloatType),
-                '.14159': (float(".14159"), types.FloatType),
-                '-.14159': (float("-.14159"), types.FloatType),
-                '"1"': ("1", types.StringType),
-                "DADGAD": ("DADGAD", types.StringType),
-                "": ("", types.StringType),
-                '1,300': ("1,300", types.StringType),  # locale?
-                '.': (".", types.StringType),  # locale?
-                '+.': ("+.", types.StringType),  # locale?
-                '-.': ("-.", types.StringType),  # locale?
-                '+': ("+", types.StringType),  # locale?
-                '-': ("-", types.StringType),  # locale?
+                u'TRUE': (True, bool),
+                u'tRuE': (True, bool),
+                u't': (True, bool),
+                u'T': (True, bool),
+                u'f': (False, bool),
+                u'false': (False, bool),
+                u'1': (1, int),
+                u'+1': (1, int),
+                u'-1': (-1, int),
+                u'0': (0, int),
+                u'+0': (0, int),
+                u'-0': (0, int),
+                u'123456789': (123456789, int),
+                u'-987654321': (-987654321, int),
+                u'011': (11, int),
+                u'-011': (-11, int),
+                u'3.14159': (float('3.14159'), float),
+                u'-3.14159': (float('-3.14159'), float),
+                u'.14159': (float('.14159'), float),
+                u'-.14159': (float('-.14159'), float),
+                u'"1"': ('1', unicode),
+                u'DADGAD': ('DADGAD', unicode),
+                u'': ('', unicode),
+                u'1,300': ('1,300', unicode),
+                u'.': ('.', unicode),
+                u'+.': ('+.', unicode),
+                u'-.': ('-.', unicode),
+                u'+': ('+', unicode),
+                u'-': ('-', unicode),
         }
         for s in corrects:
             target, targetType = corrects[s]
