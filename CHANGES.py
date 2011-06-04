@@ -214,6 +214,11 @@
 #                       sys.getfilesystemencoding() rather than assuming
 #                       UTF-8, at least in some places, but this transition
 #                       is incomplete.
+#
+# 2011/06/04 v2.02      Fixed encodings so that unicode usernames
+#                       and passwords work.
+#                       Credentials file must be encoded in UTF-8.
+
 
 
 

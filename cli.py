@@ -240,7 +240,8 @@ def execute_su_command(db, args):
     shutil.copyfile(source, dest)
     db = FluidDB(Credentials(filename=dest))
     username = db.credentials.username
-    extra = u'' if args[0] == username else (u' (file %s)' % args[0])
+    file = args[0].decode(DEFAULT_ENCODING)
+    extra = u'' if args[0] == username else (u' (file %s)' % file)
     print u'Credentials set to user %s%s.' % (username, extra)
 
 def execute_http_request(action, args, db, options):

@@ -6,8 +6,9 @@
 #               in the AUTHOR
 # Licence terms in LICENCE.
 
-__version__ = '2.01'
+__version__ = '2.02'
 
+import codecs
 import os
 import re
 import sys
@@ -179,10 +180,10 @@ class Credentials:
                 filename = get_credentials_file(username=username)
             if os.path.exists(filename):
                 try:
-                    f = open(filename)
+                    f = codecs.open(filename, 'UTF-8')
                     lines = f.readlines()
-                    self.username = lines[0].strip()
-                    self.password = lines[1].strip()
+                    self.username = lines[0].strip().decode('UTF-8')
+                    self.password = lines[1].strip().decode('UTF-8')
                     if len(lines) >= 3:
                         unixLine = lines[2].strip().lower()
                         if unixLine.startswith('unix-style-paths'):
@@ -238,10 +239,11 @@ class FluidDB:
         if not host.startswith(u'http'):
             self.host = u'http://%s' % host
         # the following based on fluiddb.py
-        userpass = '%s:%s' % (credentials.username, credentials.password)
-        auth = 'Basic %s' % userpass.encode('base64').strip()
+        userpass = u'%s:%s' % (credentials.username, credentials.password)
+        encoded = unicode(userpass.encode('UTF-8').encode('base64').strip())
+        auth = u'Basic %s' % encoded
         self.headers = {
-            u'Authorization': self.decode(auth)
+            u'Authorization': auth
         }
 
     def _get_url(self, host, path, hash, kw):
