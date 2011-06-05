@@ -19,6 +19,7 @@ from fdblib import (
     get_typed_tag_value,
     path_style,
     toStr,
+    uprint,
     version,
     DEFAULT_ENCODING,
     STATUS,
@@ -28,6 +29,7 @@ from fdblib import (
     FLUIDDB_PATH,
 )
 import ls
+import flags
 
 
 HTTP_METHODS = ['GET', 'PUT', 'POST', 'DELETE', 'HEAD']
@@ -142,6 +144,14 @@ class TagValue:
                      % (self.name, toStr(self.value), toStr(type(self.value))))
 
 
+def error_code(n):
+    code = STATUS.__dict__
+    for key in code:
+        if n == code[key]:
+            return unicode('%d (%s)' % (n, key.replace('_', ' ')))
+    return unicode(n)
+
+
 def execute_tag_command(objs, db, tags, options):
     tags = form_tag_value_pairs(tags)
     actions = {
@@ -161,7 +171,7 @@ def execute_tag_command(objs, db, tags, options):
             else:
                 warning(u'Failed to tag object %s with %s'
                         % (description, tag.name))
-                warning(u'Error code %d' % o)
+                warning(u'Error code %s' % error_code(o))
 
 
 def execute_untag_command(objs, db, tags, options):
@@ -178,9 +188,9 @@ def execute_untag_command(objs, db, tags, options):
                     print('Removed tag %s from object %s\n'
                           % (tag, description))
             else:
-                warning('Failed to remove tag %s from object %s'
+                warning(u'Failed to remove tag %s from object %s'
                         % (tag, description))
-                warning('Error code %d' % o)
+                warning(u'Error code %s' % error_code(o))
 
 
 def execute_show_command(objs, db, tags, options):
@@ -212,8 +222,8 @@ def execute_show_command(objs, db, tags, options):
             elif status == STATUS.NOT_FOUND:
                 print u'  %s' % cli_bracket(u'tag %s not present' % outtag)
             else:
-                print cli_bracket(u'error code %d getting tag %s' % (status,
-                                                                    outtag))
+                print cli_bracket(u'error code %s getting tag %s'
+                                  % (error_code(status), uttag))
 
 
 def execute_tags_command(objs, db, options):
@@ -232,8 +242,9 @@ def execute_tags_command(objs, db, options):
             elif status == STATUS.NOT_FOUND:
                 print u'  %s' % cli_bracket(u'tag %s not present' % outtag)
             else:
-                print cli_bracket(u'error code %d getting tag %s' % (status,
-                                                                    outtag))
+                print cli_bracket(u'error code %s getting tag %s'
+                                  % (error_code(status), uttag))
+
 
 def execute_whoami_command(db):
     print db.credentials.username
@@ -248,6 +259,7 @@ def execute_su_command(db, args):
     file = args[0].decode(DEFAULT_ENCODING)
     extra = u'' if args[0] == username else (u' (file %s)' % file)
     print u'Credentials set to user %s%s.' % (username, extra)
+
 
 def execute_http_request(action, args, db, options):
     """Executes a raw HTTP command (GET, PUT, POST, DELETE or HEAD)
@@ -369,7 +381,6 @@ def plural(n, s, pl=None, str=False, justTheWord=False):
             return (u'%s %s%s' % (strNum, s, pl))
 
 
-
 def parse_args(args=None):
     if args is None:
         args = [a.decode(DEFAULT_ENCODING) for a in sys.argv[1:]]
@@ -460,7 +471,7 @@ def execute_command_line(action, args, options, parser):
           and not args):
         parser.error(u'Too few arguments for action %s' % action)
     elif action == u'count':
-        print u'Total: %d objects' % (len(objs))
+        print u'Total: %s' % (flags.Plural(len(objs), u'object'))
     elif action == u'tags':
         execute_tags_command(objs, db, options)
     elif action in (u'tag', u'untag', u'show'):

@@ -236,13 +236,7 @@
 #                      not working with unicode namespaces, but that appears
 #                      to be a problem with the main instance; similar
 #                      things are working on the Sandbox.
-
-
-
-
-
-
-
-
-
-
+#
+# 2011/06/05 v2.04     Completed ls command, adding ls -L
+#                      (well, -g still to add...)
+#                      Completed draft of complete documentation.

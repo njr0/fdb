@@ -1,0 +1,27 @@
+  * Fluidinfo always uses full tag paths, i.e. to use her ``rating``
+    tag, Jacqui always has to call it ``jacqui/rating``.
+    ``fdb`` allows jacqui to refer to it simply as ``rating``.
+    If she needs to refer to someone else's tag, she simply puts
+    a slash in front of the full path.   So for Jacqui, in ``fdb``,
+    ``rating`` refers to her rating tag, but ``/njr/rating`` refers
+    to mine.
+
+    Some user's don't like this facility; ``fdb`` has both a
+    configuration option (``unix-style-paths false``)
+    and a command-line flag (``-F``) to make the fdb command line
+    accept only full Fluidinfo-style paths.
+
+  * The Fluidinfo root user, ``fluiddb`` maintains a tag generally
+    referred to as *the* about tag; its full path is ``fluiddb/about``.
+    This tag is special in that, if it is set, it uniquely and
+    permanently identifies an object; in this sense, it can be used
+    as an alternative to the object ID in many cases.
+    No two objects ever share an about tag.
+    When choosing where to place information in Fluidinfo,
+    the about tag is the usual way of deciding.
+
+    Recognizing the special place the the *about* tag has,
+    ``fdb`` allows users to refer to it as ``/about`` rather
+    than ``fluiddb/about``.   Again, this facility is removed
+    if the user chooses not to use unix-style paths.
+

@@ -1,0 +1,982 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>The fdb Command Line for Fluidinfo &mdash; fdb v2.04 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '2.04',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="fdb v2.04 documentation" href="index.html" />
+    <link rel="prev" title="Documentation for the fdb Command Line" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="index.html" title="Documentation for the fdb Command Line"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">fdb v2.04 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="the-fdb-command-line-for-fluidinfo">
+<h1>The fdb Command Line for Fluidinfo<a class="headerlink" href="#the-fdb-command-line-for-fluidinfo" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="a-brief-overview-of-fluidinfo">
+<h2>A Brief Overview of Fluidinfo<a class="headerlink" href="#a-brief-overview-of-fluidinfo" title="Permalink to this headline">¶</a></h2>
+<p>Fluidinfo is a simple, shared, online storage system in which each
+there are a set of objects, each of which can optionally be <em>about</em>
+something, and information is stored by tagging objects.
+Tags belong to users, and have names.   Tags may store information
+simply by being present or absent, or they may have values.
+Thus I  can indicate that I have read a book by attaching a tag
+called <tt class="docutils literal"><span class="pre">have-read</span></tt> to the object corresponding to that book,
+or I can rate it by attaching a <tt class="docutils literal"><span class="pre">rating</span></tt> tag with a numeric value
+to the object.   Tag owners can set permissions on their tags
+to control who can see them and who can alter/use them.
+So tags are owned and are subject to a permissions system and policies,
+while all objects are shared.</p>
+</div>
+<div class="section" id="overview-of-the-command-line">
+<h2>Overview of the Command Line<a class="headerlink" href="#overview-of-the-command-line" title="Permalink to this headline">¶</a></h2>
+<p>The fdb command line is a acts as a sort-of one-shot command shell
+for Fluidinfo.   It gives access to much of the functionality of
+the underlying <tt class="docutils literal"><span class="pre">fdb.py</span></tt> library, with a main focus on tagging,
+getting tag values, finding tags, querying Fluidinfo and clearing
+(removing tags).
+It also has some facilities for listing tags and viewing and
+altering their permissions.</p>
+<p>Assuming you have installed fdb.py, set up a credentials file,
+and created an alias <tt class="docutils literal"><span class="pre">fdb</span></tt> to run it, basic use is exemplified
+as follows.   In the examples that follow, I assume that the Fluidinfo
+user has username <tt class="docutils literal"><span class="pre">njr</span></tt>.   All tags belonging to njr start <tt class="docutils literal"><span class="pre">njr/</span></tt>.
+(<tt class="docutils literal"><span class="pre">fdb</span></tt> actually has a configuration option to allow this to be omitted,
+but for now we&#8217;ll specify the user explicitly, since that is normal
+in Fluidinfo.)</p>
+<blockquote>
+<ol class="arabic">
+<li><p class="first">Rate the Eiffel Tower as a 9:</p>
+<div class="highlight-python"><pre>$ fdb tag -a "Eiffel Tower" njr/rating=9</pre>
+</div>
+</li>
+<li><p class="first">Show the my rating and ntoll&#8217;s rating of the &#8220;Eiffel Tower&#8221;.</p>
+<div class="highlight-python"><pre>$ fdb show -a "Eiffel Tower"  fluiddb/about  njr/rating  ntoll/rating
+Object with about="Eiffel Tower":
+/objects/93bd1999-0998-49cc-8004-af457ce34ce4
+njr/rating = 9
+fluiddb/about = "Eiffel Tower"
+ntoll/rating = "I prefer the one in Blackpool"</pre>
+</div>
+</li>
+<li><p class="first">Show all the tags on the &#8220;Eiffel Tower&#8221; (now referenced by ID):</p>
+<div class="highlight-python"><pre>$ fdb tags -i 93bd1999-0998-49cc-8004-af457ce34ce4
+Object with id=93bd1999-0998-49cc-8004-af457ce34ce4:
+njr/rating = 9
+ntoll/rating = "I prefer the  the one in Blackpool"
+njr/location = "Paris"
+njr/indexed/about
+fluiddb/about = "Eiffel Tower"</pre>
+</div>
+</li>
+<li><p class="first">Add a <tt class="docutils literal"><span class="pre">dislike</span></tt> tag to each object that I have rated 1 or 0
+and then show their about tags.</p>
+<div class="highlight-python"><pre>$ fdb tag -q 'njr/rating &lt; 2' njr/dislike
+$ fdb show -q 'has njr/dislike' fluiddb/about njr/rating njr/dislike
+5 objects matched
+Object a98f2c80-ae5f-405a-a319-d47122ae9da3:
+  fluiddb/about = "book:foucaults pendulum (umberto eco)"
+  njr/rating = 1
+  njr/dislike = True
+Object 5157c69e-ceaf-4e7c-9423-d67751d029d3:
+  fluiddb/about = "The_Beatles"
+  njr/rating = 1
+  njr/dislike = True
+Object 1ab066e8-c2a1-4769-9121-e3346849e7e4:
+  fluiddb/about = "book:beloved (toni morrison)"
+  njr/rating = 1
+  njr/dislike = True
+Object ff873602-e9a8-4f9a-a7d4-c0cfc394a120:
+  fluiddb/about = "book:the lord of the rings (jrr tolkien)"
+  njr/rating = 1
+  njr/dislike = True
+Object 7aed1e67-a88e-439d-8a56-b2ab52c838ab:
+  fluiddb/about = "book:oranges are not the only fruit (jeanette winterson)"
+  njr/rating = 0
+  njr/dislike = True</pre>
+</div>
+</li>
+</ol>
+</blockquote>
+<p>Before describing these commands in detail, it will be useful
+to describe the abstraction <tt class="docutils literal"><span class="pre">fdb</span></tt> uses, as it differs in key
+respects from the underlying Fluidinfo model.</p>
+</div>
+<div class="section" id="the-fdb-abstraction">
+<h2>The fdb Abstraction<a class="headerlink" href="#the-fdb-abstraction" title="Permalink to this headline">¶</a></h2>
+<p>The Fluidinfo API is quite low level and rigid;
+<tt class="docutils literal"><span class="pre">fdb</span></tt> offers a slightly higher level of abstraction.
+Here, we briefly note the differences.</p>
+<blockquote>
+<ul>
+<li><p class="first">In the Fluidinfo API, you can&#8217;t simply tag an object with
+an <tt class="docutils literal"><span class="pre">njr/rating</span></tt> tag; you first have to tell the system that you
+wish to use a <tt class="docutils literal"><span class="pre">rating</span></tt> tag by <tt class="docutils literal"><span class="pre">creating</span></tt> it; only once you
+have done this can you use it.</p>
+<p>In <tt class="docutils literal"><span class="pre">fdb</span></tt>, you can just go ahead and set a tag; if it doesn&#8217;t
+exist, the system will create it for you.</p>
+</li>
+<li><p class="first">Fluidinfo supports <em>namespaces</em>; a namespace is to a tag much
+like a directory or folder is to a file, i.e. tags live in
+namespaces and you can have different tags with the same name in
+different namspaces, just as you can have two files with the same
+name in different folders.   User Jacqui (username <tt class="docutils literal"><span class="pre">jacqui</span></tt>)
+has a namespace
+<tt class="docutils literal"><span class="pre">jacqui</span></tt>, and she can create tags (&#8220;top-level tags&#8221;) in that
+namespace.   Jacqui may, however, wish to group tags into sets
+using namespaces.   For example, she may wish to have some private
+tags that all live in a namespace called <tt class="docutils literal"><span class="pre">private</span></tt>.   So she might
+have a private rating tag called <tt class="docutils literal"><span class="pre">jacqui/private/rating</span></tt>.
+As with tags, Fluidinfo first requires jacqui to create the <tt class="docutils literal"><span class="pre">private</span></tt>
+namespace before she can create the <tt class="docutils literal"><span class="pre">jacqui/private/rating</span></tt> tag.
+So to use <tt class="docutils literal"><span class="pre">jacqui/private/rating</span></tt> for the first time, using the
+API directly, the process would be:</p>
+<blockquote>
+<ol class="arabic simple">
+<li>Create the namespace <tt class="docutils literal"><span class="pre">private</span></tt> under <tt class="docutils literal"><span class="pre">jacqui</span></tt></li>
+<li>Create the tag <tt class="docutils literal"><span class="pre">rating</span></tt></li>
+<li>Tag the relevant object with <tt class="docutils literal"><span class="pre">rating</span></tt>.</li>
+</ol>
+</blockquote>
+</li>
+</ul>
+<blockquote>
+<p>Again, <tt class="docutils literal"><span class="pre">fdb</span></tt> takes care of all that, and allows jacqui just
+to say:</p>
+<div class="highlight-python"><pre>fdb tag -a "Eiffel Tower" jacqui/rating=10</pre>
+</div>
+<p><tt class="docutils literal"><span class="pre">fdb</span></tt> will create any tags and namespaces required on the fly.</p>
+</blockquote>
+<ul class="simple">
+<li>Finally, in Fluidinfo itself, the object ID (128-bit number,
+usually formatted as a hex-number in 8-4-4-4-12 digit groups)
+is not actually a tag on the object.   <tt class="docutils literal"><span class="pre">fdb</span></tt> allows the user
+to use refer to it as a tag, at least for reporting purposes,
+using the name <tt class="docutils literal"><span class="pre">/id</span></tt>.</li>
+</ul>
+</blockquote>
+</div>
+<div class="section" id="the-anatomy-of-the-core-fdb-commands">
+<h2>The Anatomy of the core fdb Commands<a class="headerlink" href="#the-anatomy-of-the-core-fdb-commands" title="Permalink to this headline">¶</a></h2>
+<p>The general form of the core fdb commands is:</p>
+<div class="highlight-python"><pre>fdb &lt;verb&gt; [flags] &lt;object selector&gt; &lt;tags/values&gt;</pre>
+</div>
+<p>The verb says what you want to do.   The main verbs currently avalaible are</p>
+<blockquote>
+<ul class="simple">
+<li><tt class="docutils literal"><span class="pre">tag</span></tt> &#8212; set tags on some objects</li>
+<li><tt class="docutils literal"><span class="pre">show</span></tt> &#8212; show tag values from some objects</li>
+<li><tt class="docutils literal"><span class="pre">untag</span></tt> &#8212; remove tags from some objects</li>
+<li><tt class="docutils literal"><span class="pre">tags</span></tt> &#8212; show what readable tags an object has</li>
+<li><tt class="docutils literal"><span class="pre">count</span></tt> &#8212; count the number of objects match some criterion.</li>
+</ul>
+</blockquote>
+<p>The optional <tt class="docutils literal"><span class="pre">flags</span></tt> modify the command.   The main ones used are:</p>
+<blockquote>
+<ul class="simple">
+<li><tt class="docutils literal"><span class="pre">-v</span></tt> &#8212; verbose (gives extra information)</li>
+<li><tt class="docutils literal"><span class="pre">-s</span></tt> &#8212; to specify that the command should operate againss the sandbox
+(<tt class="docutils literal"><span class="pre">sandbox.fluidinfo.com</span></tt>) rather than the main Fluidinfo instance
+(<tt class="docutils literal"><span class="pre">fluiddb.fluidinfo.com</span></tt>); this is mostly used for testing.</li>
+<li><tt class="docutils literal"><span class="pre">-U</span></tt> &#8212; use unix-style paths (overriding configuration and default;
+see below)</li>
+<li><tt class="docutils literal"><span class="pre">-F</span></tt> &#8212; use Fluidinfo-style paths (overriding configuration and
+default; see below)</li>
+<li><tt class="docutils literal"><span class="pre">-u</span> <span class="pre">userspec</span></tt> &#8212; if you have multiple Fluidinfo accounts, this
+specifies an alternate credentials file to use, normally identified
+by the username (see below).</li>
+</ul>
+</blockquote>
+<p>The <tt class="docutils literal"><span class="pre">&lt;object</span> <span class="pre">selector&gt;</span></tt> is used to specify which objects you are interested
+in and usually takes on of three forms:</p>
+<blockquote>
+<ul class="simple">
+<li><tt class="docutils literal"><span class="pre">-a</span> <span class="pre">&quot;about</span> <span class="pre">tag</span> <span class="pre">value&quot;</span></tt> is used to specify an object on the basis of
+its about tag (<tt class="docutils literal"><span class="pre">fluiddb/about</span></tt>).   For example,
+<tt class="docutils literal"><span class="pre">-a</span> <span class="pre">&quot;book:nineteen</span> <span class="pre">eighty</span> <span class="pre">four</span> <span class="pre">(george</span> <span class="pre">orwell)&quot;</span></tt> specifies an important
+book by George Orwell.</li>
+<li><tt class="docutils literal"><span class="pre">-i</span> <span class="pre">ID</span></tt> is used to specify an object on the basis of its
+ID (expressed as a hex string, appropriately formatted).
+For example, <tt class="docutils literal"><span class="pre">-i</span> <span class="pre">93bd1999-0998-49cc-8004-af457ce34ce4</span></tt>
+specifies the object with this ID, which happens to be the
+on with the about tag <tt class="docutils literal"><span class="pre">Eiffel</span> <span class="pre">Tower</span></tt>.</li>
+<li><tt class="docutils literal"><span class="pre">-q</span> <span class="pre">&quot;fluidinfo</span> <span class="pre">query&quot;</span></tt> is used to specify a set of objects
+on the basis of a query expressed in the Fluidinfo query language.
+For example <tt class="docutils literal"><span class="pre">-q</span> <span class="pre">has</span> <span class="pre">njr/rating</span></tt> specifies objects that have
+an njr/rating rag on them.</li>
+</ul>
+</blockquote>
+<p>Finally, some commands need or accept a list of tags or tag-value pairs.
+Specifically, <tt class="docutils literal"><span class="pre">show</span></tt> and <tt class="docutils literal"><span class="pre">untag</span></tt> both require a list of tags to be
+shown or removed, and <tt class="docutils literal"><span class="pre">tag</span></tt> requires a set of tag-value pairs to know
+what tags to set.   Tag value pairs usually take the form:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">tag</span><span class="o">=</span><span class="n">value</span>
+</pre></div>
+</div>
+<p>so that a list of them might be</p>
+<div class="highlight-python"><pre>rating=9 description="fabulous" seen=true price = 18.77</pre>
+</div>
+<p>(fdb is not too fussy about whether you put spaces around equals signs
+or not.)</p>
+<p>In general, strings should be in double quotes <tt class="docutils literal"><span class="pre">&quot;like</span> <span class="pre">this&quot;</span></tt>,
+booleans should be <tt class="docutils literal"><span class="pre">true</span></tt>,
+<tt class="docutils literal"><span class="pre">false</span></tt>, <tt class="docutils literal"><span class="pre">t</span></tt> or <tt class="docutils literal"><span class="pre">f</span></tt> (unquoted) and numbers should just be plain numbers
+like 3 or 4.7.
+All strings are always unicode, i.e. they may contain any character.</p>
+<p>It is also possible to set a tag without a value by just giving a tag name.</p>
+</div>
+<div class="section" id="command-reference">
+<h2>Command Reference<a class="headerlink" href="#command-reference" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="fdb-tag">
+<h3>fdb tag<a class="headerlink" href="#fdb-tag" title="Permalink to this headline">¶</a></h3>
+<p>Adds one or more tags (with optional values) to the object or objects
+specified.</p>
+<p><strong>FORM</strong></p>
+<div class="highlight-python"><pre>fdb tag [flags] &lt;object specifier&gt; &lt;tag-value-pairs&gt;</pre>
+</div>
+<p><strong>EXAMPLES</strong></p>
+<div class="highlight-python"><pre>fdb tag -a "Eiffel Tower" njr/rating=7 njr/seen
+fdb tag -a "Eiffel Tower" njr/rating = 7 njr/seen
+fdb tag -i 93bd1999-0998-49cc-8004-af457ce34ce4 njr/rating=7 njr/seen
+fdb tag -q 'fluiddb/about matches "Eiffel Tower"' njr/rating=7 njr/seen
+fdb tag -U -a "Eiffel Tower" rating=7 seen</pre>
+</div>
+<p>All of these commands will tag the object with about tag &#8220;Eiffel Tower&#8221;
+and ID <tt class="docutils literal"><span class="pre">93bd1999-0998-49cc-8004-af457ce34ce4</span></tt> with two
+tags&#8212;<tt class="docutils literal"><span class="pre">njr/rating</span></tt> of 7 and <tt class="docutils literal"><span class="pre">njr/seen</span></tt> with no value.
+The last one may also tag other objects since the query</p>
+<div class="highlight-python"><pre>fluiddb/about matches "Eiffel Tower"</pre>
+</div>
+<p>is search-engine-style string match that will match any about tag
+containing the words <tt class="docutils literal"><span class="pre">Eiffel</span></tt> and <tt class="docutils literal"><span class="pre">Tower</span></tt>, ignoring case, other words
+and punctuation.</p>
+<p>The <tt class="docutils literal"><span class="pre">-U</span></tt> option specifies &#8220;unix-style&#8221; relative paths; when this option
+is used, tag names are assumed to be relative to the authenticated user&#8217;s
+namespace; if other user&#8217;s tags are to be referred to, they must be
+introduced with a leading <tt class="docutils literal"><span class="pre">/</span></tt> (e.g. <tt class="docutils literal"><span class="pre">/ntoll/rating).</span>
+<span class="pre">Note</span> <span class="pre">that</span> <span class="pre">``-U</span></tt> does not affect queries specified with <tt class="docutils literal"><span class="pre">-q</span></tt>,
+i.e. full Fluidinfo-style paths must be used inside the query.</p>
+<p>The command produces no output when successful and a suitable
+warning when it fails.</p>
+<div class="highlight-python"><pre>$ fdb tag -a "Eiffel Tower" njr/rating=7
+
+$ fdb tag -a "Eiffel Tower" ntoll/rating=7
+Failed to tag object with about="Eiffel Tower" with ntoll/rating
+Error code 401 (UNAUTHORIZED)</pre>
+</div>
+<p><strong>NOTES</strong></p>
+<p>When specified by about tag, the object does not need to exist
+in Fluidinfo prior to the operation; if necessary an object with
+the given about tag will be created.   (Conceptually, an object
+for every possible about tag always exists in Fluidinfo;
+they are just <em>instantiated lazily</em>, i.e. allocated IDs when first used.)</p>
+<p>The user must have permission to write the tag.
+By default, the user can write any tag under her namespace.</p>
+</div>
+<div class="section" id="fdb-untag">
+<h3>fdb untag<a class="headerlink" href="#fdb-untag" title="Permalink to this headline">¶</a></h3>
+<p>Removes one or more tags from the object or objects specified.</p>
+<p><strong>FORM</strong></p>
+<div class="highlight-python"><pre>fdb untag [flags] &lt;object specifier&gt; &lt;tags&gt;</pre>
+</div>
+<p><strong>EXAMPLES</strong></p>
+<div class="highlight-python"><pre>fdb untag -a "Eiffel Tower" njr/rating njr/seen
+fdb untag -a "Eiffel Tower" njr/rating njr/seen
+fdb untag -i 93bd1999-0998-49cc-8004-af457ce34ce4 njr/rating njr/seen
+fdb untag -q 'fluiddb/about matches "Eiffel Tower"' njr/rating njr/seen
+fdb untag -U -a "Eiffel Tower" rating seen</pre>
+</div>
+<p>All of these commands will remove the tags <tt class="docutils literal"><span class="pre">njr/rating</span></tt>
+and <tt class="docutils literal"><span class="pre">njr/seen</span></tt> from the object with about tag &#8220;Eiffel Tower&#8221;
+and ID <tt class="docutils literal"><span class="pre">93bd1999-0998-49cc-8004-af457ce34ce4</span></tt>;
+The last one may also tag other objects since the query</p>
+<div class="highlight-python"><pre>fluiddb/about matches "Eiffel Tower"</pre>
+</div>
+<p>is search-engine-style string match that will match any about tag
+containing the words <tt class="docutils literal"><span class="pre">Eiffel</span></tt> and <tt class="docutils literal"><span class="pre">Tower</span></tt>, ignoring case, other words
+and punctuation.</p>
+<p>The <tt class="docutils literal"><span class="pre">-U</span></tt> option specifies &#8220;unix-style&#8221; relative paths; when this option
+is used, tag names are assumed to be relative to the authenticated user&#8217;s
+namespace; if other user&#8217;s tags are to be referred to, they must be
+introduced with a leading <tt class="docutils literal"><span class="pre">/</span></tt> (e.g. <tt class="docutils literal"><span class="pre">/ntoll/rating).</span>
+<span class="pre">Note</span> <span class="pre">that</span> <span class="pre">``-U</span></tt> does not affect queries specified with <tt class="docutils literal"><span class="pre">-q</span></tt>,
+i.e. full Fluidinfo-style paths must be used inside the query.</p>
+<p>The command produces no output when successful, even if the tag did
+not exist.</p>
+<div class="highlight-python"><pre>$ fdb untag -F -a "Eiffel Tower" ntoll/rating
+Failed to remove tag ntoll/rating from object with about="Eiffel Tower"
+Error code 401 (UNAUTHORIZED)</pre>
+</div>
+<p><strong>NOTE</strong></p>
+<p>The user&#8217;s ability to remove tags from objects is governed by
+the permissions system.</p>
+</div>
+<div class="section" id="fdb-show">
+<h3>fdb show<a class="headerlink" href="#fdb-show" title="Permalink to this headline">¶</a></h3>
+<p>Shows the values of the tags nominated from the objects specified.</p>
+<p><strong>FORM</strong></p>
+<div class="highlight-python"><pre>fdb show [flags] &lt;object specifier&gt; &lt;tags&gt;</pre>
+</div>
+<p><strong>EXAMPLES</strong></p>
+<div class="highlight-python"><pre>$ fdb show -a "Eiffel Tower" njr/rating njr/seen ntoll/seen
+Object with about="Eiffel Tower":
+  njr/rating = 7
+  njr/seen
+  (tag ntoll/seen not present)</pre>
+</div>
+<p>Alternative specifications:</p>
+<div class="highlight-python"><pre>fdb show -a "Eiffel Tower" njr/rating njr/seen ntoll/seen
+fdb show -i 93bd1999-0998-49cc-8004-af457ce34ce4 njr/rating njr/seen ntoll/seen
+fdb show -q 'fluiddb/about matches "Eiffel Tower"' njr/rating njr/seen ntoll/seen
+fdb show -U -a "Eiffel Tower" rating seen ntoll/seen</pre>
+</div>
+<p>All of these commands will show the values the tags <tt class="docutils literal"><span class="pre">njr/rating</span></tt>,
+<tt class="docutils literal"><span class="pre">njr/seen</span></tt> and <tt class="docutils literal"><span class="pre">ntoll/seen</span></tt> from the object with about tag &#8220;Eiffel Tower&#8221;
+and ID <tt class="docutils literal"><span class="pre">93bd1999-0998-49cc-8004-af457ce34ce4</span></tt>;
+The last one may also show other objects since the query</p>
+<div class="highlight-python"><pre>fluiddb/about matches "Eiffel Tower"</pre>
+</div>
+<p>is search-engine-style string match that will match any about tag
+containing the words <tt class="docutils literal"><span class="pre">Eiffel</span></tt> and <tt class="docutils literal"><span class="pre">Tower</span></tt>, ignoring case, other words
+and punctuation.</p>
+<p>The <tt class="docutils literal"><span class="pre">-U</span></tt> option specifies &#8220;unix-style&#8221; relative paths; when this option
+is used, tag names are assumed to be relative to the authenticated user&#8217;s
+namespace; if other user&#8217;s tags are to be referred to, they must be
+introduced with a leading <tt class="docutils literal"><span class="pre">/</span></tt> (e.g. <tt class="docutils literal"><span class="pre">/ntoll/rating).</span>
+<span class="pre">Note</span> <span class="pre">that</span> <span class="pre">``-U</span></tt> does not affect queries specified with <tt class="docutils literal"><span class="pre">-q</span></tt>,
+i.e. full Fluidinfo-style paths must be used inside the query.</p>
+<p>The command produces no output when successful, even if the tag did
+not exist.</p>
+<div class="highlight-python"><pre>$ fdb untag -F -a "Eiffel Tower" ntoll/rating
+Failed to remove tag ntoll/rating from object with about="Eiffel Tower"
+Error code 401 (UNAUTHORIZED)</pre>
+</div>
+<p><strong>NOTE</strong></p>
+<p>The user&#8217;s ability to read tags is regulated by the permissions system.</p>
+</div>
+<div class="section" id="fdb-tags">
+<h3>fdb tags<a class="headerlink" href="#fdb-tags" title="Permalink to this headline">¶</a></h3>
+<p>Show the list of tags (and their values) present on an objects</p>
+<p><strong>FORM</strong></p>
+<div class="highlight-python"><pre>fdb tag [flags] &lt;object specifier&gt;</pre>
+</div>
+<p><strong>EXAMPLES</strong></p>
+<div class="highlight-python"><pre>$ fdb tags -a "Eiffel Tower" njr/rating njr/seen ntoll/seen
+Object with about="Eiffel Tower":
+/objects/93bd1999-0998-49cc-8004-af457ce34ce4
+  njr/seen
+  fluiddb/about = "Eiffel Tower"
+  njr/njr/seen
+  njr/rating = 7
+  njr/index/about
+  njr/location = "Paris"</pre>
+</div>
+<p>Alternative specifications:</p>
+<div class="highlight-python"><pre>fdb tags -a "Eiffel Tower"
+fdb tags -i 93bd1999-0998-49cc-8004-af457ce34ce4
+fdb tags -q 'fluiddb/about matches "Eiffel Tower"'</pre>
+</div>
+<p>All of these commands will show the names and values of all the tags
+(for which the user has read permission)
+from the object with about tag &#8220;Eiffel Tower&#8221;
+and ID <tt class="docutils literal"><span class="pre">93bd1999-0998-49cc-8004-af457ce34ce4</span></tt>;
+The last one may also show other objects since the query</p>
+<div class="highlight-python"><pre>fluiddb/about matches "Eiffel Tower"</pre>
+</div>
+<p>is search-engine-style string match that will match any about tag
+containing the words <tt class="docutils literal"><span class="pre">Eiffel</span></tt> and <tt class="docutils literal"><span class="pre">Tower</span></tt>, ignoring case, other words
+and punctuation.</p>
+</div>
+<div class="section" id="fdb-count">
+<h3>fdb count<a class="headerlink" href="#fdb-count" title="Permalink to this headline">¶</a></h3>
+<p>Counts the number of objects matching a set of conditions</p>
+<p><strong>FORM</strong></p>
+<div class="highlight-python"><pre>fdb count [flags] &lt;object specifier&gt;</pre>
+</div>
+<p><strong>EXAMPLES</strong></p>
+<div class="highlight-python"><pre>$ fdb count -q 'has njr/rating'
+141 objects matched
+Total: 141 objects
+
+$ fdb count -a 'Eiffel Tower'
+Total: 1 object
+
+$ fdb count -q 'fluiddb/about matches "Eiffel Tower"'
+6 objects matched
+Total: 6 objects</pre>
+</div>
+<p>The command produces no output when successful, even if the tag did
+not exist.</p>
+<div class="highlight-python"><pre>$ fdb untag -F -a "Eiffel Tower" ntoll/rating
+Failed to remove tag ntoll/rating from object with about="Eiffel Tower"
+Error code 401 (UNAUTHORIZED)</pre>
+</div>
+<p><strong>NOTES</strong></p>
+<p>The Fluidinfo API does not provide a primitive <tt class="docutils literal"><span class="pre">count</span></tt> function,
+so FDB actually has to retrieve all the objects that match the query
+and count them; this operation can, therefore, be comparatively slow.</p>
+<p>The user&#8217;s ability to read tags is regulated by the permissions system,
+so the count reflects that, i.e. it is the restricted to objects
+that the user can see the relevant tags for.</p>
+</div>
+<div class="section" id="fdb-ls">
+<h3>fdb ls<a class="headerlink" href="#fdb-ls" title="Permalink to this headline">¶</a></h3>
+<p>The <tt class="docutils literal"><span class="pre">ls</span></tt> command is used to view a sorted list of tags or namespaces,
+potentially with additional information.</p>
+<p><strong>FORM</strong></p>
+<div class="highlight-python"><pre>ls [flags] [&lt;namespace&gt;|&lt;tag&gt;]</pre>
+</div>
+<p><strong>FLAGS</strong></p>
+<blockquote>
+<ul class="simple">
+<li><tt class="docutils literal"><span class="pre">-l</span></tt> long listing (one per line; showing permissions)</li>
+<li><tt class="docutils literal"><span class="pre">-g</span></tt> group listing (one per line; showing exception groups and permissions)</li>
+<li><tt class="docutils literal"><span class="pre">-L</span></tt> longer listing (show full Fluidinfo-style permissions listing)</li>
+<li><tt class="docutils literal"><span class="pre">-n</span></tt> list the namesace as an object, rather than the contents of the namespace</li>
+<li><tt class="docutils literal"><span class="pre">-d</span></tt> same as <tt class="docutils literal"><span class="pre">-n</span></tt></li>
+<li><tt class="docutils literal"><span class="pre">-R</span></tt> recursive (show contents of all subnamespaces, recursively)</li>
+</ul>
+</blockquote>
+<p>as well as the standard flags like <tt class="docutils literal"><span class="pre">-s</span></tt> etc.</p>
+<p><strong>EXAMPLES</strong></p>
+<blockquote>
+<ol class="arabic">
+<li><p class="first">List the tags in the user&#8217;s namespace:</p>
+<p>(Here, we assume we are authenticated as user <tt class="docutils literal"><span class="pre">miro</span></tt>):</p>
+<div class="highlight-python"><pre>$ fdb ls
+bestsellers-1998-2010/    first_field_id            n_records
+bestsellers1998to2010/    first_record_id           next-field-about
+books/                    forename                  next-field-id
+class                     has-about-links           next_field_about
+consistent                has-field-numbers         next_field_id
+description               has-id-links              planets/
+elements/                 has-record-numbers        rating
+field-name                has_about_links           small/
+field-number              has_field_numbers         surname
+field_number              has_id_links              table-name
+first-field-about         has_record_numbers        testconvtag
+first-field-id            message                   testrating
+first-record-about        n-fields                  testtable/
+first-record-id           n-records                 type
+first_field_about         n_fields                  unit</pre>
+</div>
+<p>Note that namespaces are shown with a trailing <tt class="docutils literal"><span class="pre">/</span></tt>; for users familiar
+with the unix <tt class="docutils literal"><span class="pre">ls</span></tt> command, this is modelled on <tt class="docutils literal"><span class="pre">ls</span> <span class="pre">-F</span></tt>.</p>
+</li>
+<li><p class="first">List the tags and subnamespaces in a given namespace:</p>
+<div class="highlight-python"><pre>$ fdb ls miro/planets
+Atmosphere                Mass                      OrbitalRadius
+Category                  Moons                     RotationPeriod
+EquatorialDiameter        Name                      db-next-record-about
+HasRings                  OrbitalEccentricity       db-record-number
+Inclination               OrbitalPeriod</pre>
+</div>
+<p>Sort order is case-sensitive, e.g. (in English) all lower-case letters
+follow upper-case letters.</p>
+</li>
+<li><p class="first">List a single tag (report presence or absence of that tag).</p>
+<div class="highlight-python"><pre>$ fdb ls miro/planets/Mass
+miro/planets/Mass
+
+$ fdb ls -F miro/planets/NoMass
+miro/planets/NoMass not found</pre>
+</div>
+</li>
+<li><p class="first">Long listing for tag (<tt class="docutils literal"><span class="pre">njr/rating</span></tt>), including permissions summary:</p>
+<div class="highlight-python"><pre>$ fdb ls -l njr/rating
+trwcr--r--   rating</pre>
+</div>
+<p>See the section on permissions for a full explanation of the permissions
+string.   Briefly</p>
+<blockquote>
+<ul class="simple">
+<li>the first <tt class="docutils literal"><span class="pre">t</span></tt> indicates that this is a tag rather
+than a namespace</li>
+<li>the next three characters indicate that the owner (<tt class="docutils literal"><span class="pre">njr</span></tt>)
+has read, write and control permission on the tag,</li>
+<li>the next three characters indicate that any group exceptions have
+read permission only on the tag</li>
+<li>and the final three characters indicate that everyone (world)
+has read permission but not write or control permission
+on the tag.</li>
+</ul>
+</blockquote>
+</li>
+<li><p class="first">Longer listing for tag (<tt class="docutils literal"><span class="pre">njr/rating</span></tt>), including Fluidinfo-style
+permissions summary:</p>
+<div class="highlight-python"><pre>$ fdb ls -L njr/rating
+
+njr/rating:
+
+ABSTRACT TAG (/tags)
+  Write
+    update (metadata):  policy: closed; exceptions [njr]
+    delete (delete):    policy: closed; exceptions [njr]
+  Control
+    control (control):  policy: closed; exceptions [njr]
+
+TAG (/tag-values)
+  Read
+    read (read):        policy: open; exceptions []
+  Write
+    create (tag):       policy: closed; exceptions [njr]
+    delete (untag):     policy: closed; exceptions [njr]
+  Control
+    control (control):  policy: closed; exceptions [njr]</pre>
+</div>
+</li>
+<li><p class="first">Long listing for contents of namespace (<tt class="docutils literal"><span class="pre">njr/index</span></tt>):</p>
+<div class="highlight-python"><pre>$ fdb ls -l njr/index
+trwcr--r--   about
+trwcr--r--   class</pre>
+</div>
+</li>
+<li><p class="first">Long listing for a namespace itself (<tt class="docutils literal"><span class="pre">njr/index</span></tt>) (as opposed to
+its contents),  including Fluidinfo-style permissions summary:</p>
+<div class="highlight-python"><pre>  $ fdb ls -ln njr/index
+  nrwcr--r--   index
+
+  $ fdb ls -ld njr/index
+  nrwcr--r--   index
+
+The first ``n`` indicates that ``njr/index`` is a namespace rather than
+a tag.   This option may be specified using ``-n`` (for namespace)
+or ``-d`` (for directory) since the latter will probably be more natural
+for users familiar with unix-style ``ls``.
+
+See the section on permissions for an explanation of the permissions
+string.</pre>
+</div>
+</li>
+<li><p class="first">Longer listing for a namespace itself (<tt class="docutils literal"><span class="pre">njr/index</span></tt>) (as opposed to
+its contents):</p>
+<div class="highlight-python"><pre>$ fdb ls -Ld njr/index
+
+NAMESPACE (/namespaces)
+  Read
+    list (read):        policy: open; exceptions []
+  Write
+    create (create):    policy: closed; exceptions [njr]
+    delete (delete):    policy: closed; exceptions [njr]
+  Control
+    control (control):  policy: closed; exceptions [njr]</pre>
+</div>
+</li>
+<li><p class="first">Long listing including group details (for tag <tt class="docutils literal"><span class="pre">njr/rating</span></tt>)</p>
+<div class="highlight-python"><pre>$ fdb ls -ln njr/fi
+nrwcr-----   ceronman+esteve+jkakar+ntoll+terrycojones fi</pre>
+</div>
+<p>See the section on permissions for an explanation of the permissions
+string.   In this case</p>
+<blockquote>
+<ul class="simple">
+<li>the first <tt class="docutils literal"><span class="pre">n</span></tt> indicates that this is a namespace</li>
+<li>the next three characters indicate that the owner (<tt class="docutils literal"><span class="pre">njr</span></tt>)
+has read, write and control permission on the tag,</li>
+<li>the next three characters indicate that members of the
+exception group exceptions have read (&#8220;list&#8221;) permission
+on the tag (but not write or control permissions).</li>
+<li>the final three characters indicate that Fluidinfo users
+other than the owner and the people in the exception group
+do not have any permissions to read, write or control the namespace.</li>
+</ul>
+</blockquote>
+<p>The list of users separated by plus signs is the list of
+users on the exceptions list.</p>
+<p>The next example shows Fluidinfo&#8217;s native representation of the
+permissions for this namespace.</p>
+</li>
+<li><p class="first">Longer listing for namspace (<tt class="docutils literal"><span class="pre">njr/fi</span></tt>), including Fluidinfo-style
+permissions summary:</p>
+<div class="highlight-python"><pre>$ fdb ls -Ln njr/fi
+
+Permissions for namespace njr/fi:
+
+READ:
+  list (read):        policy: closed; exceptions: [ceronman, esteve, jkakar, njr, ntoll, terrycojones]
+
+WRITE:
+  create (create):    policy: closed; exceptions: [njr]
+  update (metadata):  policy: closed; exceptions: [njr]
+  delete (delete):    policy: closed; exceptions: [njr]
+
+CONTROL:
+  control (control):  policy: closed; exceptions: [njr]</pre>
+</div>
+</li>
+<li><p class="first">List contents of all subnamespaces (recursive descent):</p>
+<div class="highlight-python"><pre>ls -R miro
+miro:
+bestsellers-1998-2010/    first_field_id            n_records
+bestsellers1998to2010/    first_record_id           next-field-about
+books/                    forename                  next-field-id
+class                     has-about-links           next_field_about
+consistent                has-field-numbers         next_field_id
+description               has-id-links              planets/
+elements/                 has-record-numbers        rating
+field-name                has_about_links           small/
+field-number              has_field_numbers         surname
+field_number              has_id_links              table-name
+first-field-about         has_record_numbers        testconvtag
+first-field-id            message                   testrating
+first-record-about        n-fields                  testtable/
+first-record-id           n-records                 type
+first_field_about         n_fields                  unit
+
+miro/bestsellers-1998-2010:
+ASP                       db-next-record-about      rank
+RRP                       db-record-number          title
+author                    imprint                   value
+binding                   productclass              volume
+date                      publisher
+
+miro/bestsellers1998to2010:
+
+
+miro/books:
+author                    guardian-1000             year
+db-next-record-about      surname
+forename                  title
+
+miro/elements:
+AtomicWeight              Description               Period
+BoilingPointC             Etymology                 RelativeAtomicMass
+BoilingPointF             Group                     Symbol
+ChemicalSeries            MeltingPointC             Z
+Colour                    MeltingPointKelvin        db-next-record-about
+Density                   Name                      db-record-number
+
+miro/planets:
+Atmosphere                Mass                      OrbitalRadius
+Category                  Moons                     RotationPeriod
+EquatorialDiameter        Name                      db-next-record-about
+HasRings                  OrbitalEccentricity       db-record-number
+Inclination               OrbitalPeriod
+
+miro/small:
+db-record-number    id                  intField
+
+miro/testtable:
+db-next-record-about      db-record-number          i</pre>
+</div>
+</li>
+</ol>
+</blockquote>
+</div>
+<div class="section" id="fdb-su">
+<h3>fdb su<a class="headerlink" href="#fdb-su" title="Permalink to this headline">¶</a></h3>
+<p>Set user: changes the set of credentials in use by <tt class="docutils literal"><span class="pre">fdb</span></tt>.</p>
+<p><strong>FORM</strong></p>
+<div class="highlight-python"><pre>fdb su userspec</pre>
+</div>
+<p><strong>EXAMPLES</strong></p>
+<div class="highlight-python"><pre>fdb su foo</pre>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">fdb</span></tt> command expects user credentials for Fluidinfo to be stored
+in a file in the users&#8217;s home directory.   On unix systems, this file
+is <tt class="docutils literal"><span class="pre">~/.fluidDBcredentials</span></tt>; on Windows systems it is
+<tt class="docutils literal"><span class="pre">fluiddbcredentials.ini</span></tt> in the user&#8217;s home folder..</p>
+<p>The the user has access to more than on Fluidinfo account, multiple
+credentials may be stored in variant files.   In unix systems,
+these files have names like <tt class="docutils literal"><span class="pre">~/.fluidDBcredentials.foo</span></tt>;
+on windows they have names like <tt class="docutils literal"><span class="pre">fluiddbcredentials-foo.ini</span></tt>.</p>
+<p>A different set of credentials can be used for any one-off command
+by adding <tt class="docutils literal"><span class="pre">-u</span> <span class="pre">foo</span></tt> to the command line; this will cause the credentials
+in the <tt class="docutils literal"><span class="pre">foo</span></tt> variant of the file to be used.</p>
+<p>The <tt class="docutils literal"><span class="pre">fdb</span> <span class="pre">su</span> <span class="pre">command</span></tt> changes the default set of credentials to be used
+by copying the specified variant file over the default file.
+Because it is a simple copy, this is a <em>global</em> change, i.e. it affects
+all sessions, not just one in the current shell.    So on unix,</p>
+<div class="highlight-python"><pre>fdb su njr</pre>
+</div>
+<p>is exactly equivalent to</p>
+<div class="highlight-python"><pre>cp ~/.fluidDBcredentials.njr ~/.fluidDBcredentials</pre>
+</div>
+</div>
+<div class="section" id="fdb-whoami">
+<h3>fdb whoami<a class="headerlink" href="#fdb-whoami" title="Permalink to this headline">¶</a></h3>
+<p>Shows the username name of the current user credentials.
+<strong>FORM</strong></p>
+<div class="highlight-python"><pre>fdb whoami</pre>
+</div>
+<p><strong>EXAMPLES</strong></p>
+<div class="highlight-python"><pre>$ fdb whoami
+
+$ fdb su greek
+Credentials set to user Νικολας (file greek).
+
+$ fdb whoami
+Νικολας</pre>
+</div>
+</div>
+<div class="section" id="fdb-pwd-fdb-pwn">
+<h3>fdb pwd / fdb pwn<a class="headerlink" href="#fdb-pwd-fdb-pwn" title="Permalink to this headline">¶</a></h3>
+<p>For the moment, <tt class="docutils literal"><span class="pre">fdb</span> <span class="pre">pwd</span></tt> and <tt class="docutils literal"><span class="pre">fdb</span> <span class="pre">pwn</span></tt> (print working directory/namespace)
+both execute <tt class="docutils literal"><span class="pre">fdb</span> <span class="pre">whoami</span></tt>.
+At some point in the future, <tt class="docutils literal"><span class="pre">fdb</span></tt> may support the notion of a working
+namespace and a <tt class="docutils literal"><span class="pre">cd</span></tt> command; this is only really relevant if the
+user chooses to use unix-style paths with <tt class="docutils literal"><span class="pre">fdb</span></tt>.</p>
+</div>
+<div class="section" id="fdb-test">
+<h3>fdb test<a class="headerlink" href="#fdb-test" title="Permalink to this headline">¶</a></h3>
+<p>Runs fdb&#8217;s self-tests.</p>
+<p><strong>FORM</strong></p>
+<div class="highlight-python"><pre>fdb test [flags] [subset to run]
+fdb testcli
+fdb testapi
+fdb testdb</pre>
+</div>
+<p>The only normally relevant flag is <tt class="docutils literal"><span class="pre">-s</span></tt>, to run against the sandbox.</p>
+<p>The <tt class="docutils literal"><span class="pre">testcli</span></tt>, <tt class="docutils literal"><span class="pre">testdb</span></tt> and <tt class="docutils literal"><span class="pre">testapi</span></tt> variants run subets of the tests.</p>
+<p><strong>EXAMPLE</strong></p>
+<div class="highlight-python"><pre>$ fdb test
+......................
+----------------------------------------------------------------------
+Ran 22 tests in 47.210s</pre>
+</div>
+<p>Everything is running correctly if you get a line of dots with no
+<tt class="docutils literal"><span class="pre">E</span></tt> (error) or <tt class="docutils literal"><span class="pre">F</span></tt> failures.</p>
+</div>
+<div class="section" id="fdb-help">
+<h3>fdb help<a class="headerlink" href="#fdb-help" title="Permalink to this headline">¶</a></h3>
+<p>Shows help information.</p>
+</div>
+<div class="section" id="fdb-version">
+<h3>fdb <tt class="docutils literal"><span class="pre">--version</span></tt><a class="headerlink" href="#fdb-version" title="Permalink to this headline">¶</a></h3>
+<p>Reports the version of fdb running; <tt class="docutils literal"><span class="pre">-V</span></tt> may be used as a short form.</p>
+</div>
+</div>
+</div>
+<div class="section" id="installation-and-configuration">
+<h1>Installation and Configuration<a class="headerlink" href="#installation-and-configuration" title="Permalink to this headline">¶</a></h1>
+<p><strong>IMPORTANT CHANGE</strong> From version 2.00 onwards, Fluidinfo
+has become more conventional; see <cite>Tag Conventions</cite></p>
+<div class="section" id="download">
+<h2>Download<a class="headerlink" href="#download" title="Permalink to this headline">¶</a></h2>
+<p>fdb is available from Github at <a class="reference external" href="https://github.com/njr0/fdb">https://github.com/njr0/fdb</a> (use the
+download button).   Place fluiddb somewhere on your python path
+(environment variable <tt class="docutils literal"><span class="pre">PYTHONPATH</span></tt>).</p>
+</div>
+<div class="section" id="dependencies">
+<h2>Dependencies<a class="headerlink" href="#dependencies" title="Permalink to this headline">¶</a></h2>
+<p>If you&#8217;re running python 2.6, fdb.py should just run.   With earlier
+version of python, you need to get access to simplejson and httplib2.
+You can get simplejson from <a class="reference external" href="http://pypi.python.org/pypi/simplejson/">http://pypi.python.org/pypi/simplejson/</a>
+and httplib2 from <a class="reference external" href="http://code.google.com/p/httplib2/">http://code.google.com/p/httplib2/</a>.</p>
+</div>
+<div class="section" id="making-the-fdb-command-available">
+<h2>Making the fdb command available<a class="headerlink" href="#making-the-fdb-command-available" title="Permalink to this headline">¶</a></h2>
+<p>The file <tt class="docutils literal"><span class="pre">fdb</span></tt> included in the download is executable provided that
+a suitable python is installed.    You can make it available more
+conveniently by using a shell alias or adding a symbolic link to it
+somewhere on your <tt class="docutils literal"><span class="pre">PATH</span></tt>.   For example:</p>
+<div class="highlight-python"><pre>alias fdb='/path/to/fdb'</pre>
+</div>
+<p>or, if <tt class="docutils literal"><span class="pre">~/bin</span></tt> is on your <tt class="docutils literal"><span class="pre">PATH</span></tt>:</p>
+<div class="highlight-python"><pre>cd ~/bin
+ln -s /path/to/fdb</pre>
+</div>
+</div>
+<div class="section" id="fdb-python-library-and-command-line">
+<h2>fdb Python Library and Command Line<a class="headerlink" href="#fdb-python-library-and-command-line" title="Permalink to this headline">¶</a></h2>
+<p>fdb is a primarily a command line tool for providing access to the
+Fluidinfo data store (from Fluidinfo (<a class="reference external" href="http://fluidinfo.com/">http://fluidinfo.com/</a>.)
+There is lots of coverage of the library (and its evolution) at
+<a class="reference external" href="http://blog.abouttag.com/">http://blog.abouttag.com/</a>.</p>
+<p>fdb can also be used as a python library for accessing Fluidinfo, but
+it is less complete and less conventional the Ali Afshar&#8217;s FOM library
+(<a class="reference external" href="https://launchpad.net/fom">https://launchpad.net/fom</a>), which is generally preferred for
+programmatic use.</p>
+</div>
+<div class="section" id="credentials">
+<h2>Credentials<a class="headerlink" href="#credentials" title="Permalink to this headline">¶</a></h2>
+<p>For many operations, you also need an account on FluidDB,
+and credentials (a username and password).   You can get these from</p>
+<blockquote>
+<a class="reference external" href="http://fluidinfo.com/accounts/new">http://fluidinfo.com/accounts/new</a></blockquote>
+<p>fdb expects your credentials to be available in a two-line file
+in the format</p>
+<p>username
+password</p>
+<p>On Unix, the default location for this is ~/.fluidDBcredentials,
+and on Windows the default file is fluidDBcredentials.ini in your
+home folder.</p>
+<p>You can also optionally add a line, after password, saying either</p>
+<p>unix-style-paths true
+or unix-style-paths false</p>
+<p>(see next section)</p>
+</div>
+<div class="section" id="tag-conventions">
+<h2>Tag Conventions<a class="headerlink" href="#tag-conventions" title="Permalink to this headline">¶</a></h2>
+<p>As from version 2.00, fdb uses absolute Fluidinfo-style paths all the time
+(i.e. you always specify the namespace and don&#8217;t use a leading slash).
+You can explicitly mandate this also by adding the line</p>
+<div class="highlight-python"><pre>unix-style-paths false</pre>
+</div>
+<p>in your credentials file (see above).
+If you instead set</p>
+<div class="highlight-python"><pre>unix-style-paths true</pre>
+</div>
+<p>on the third line of the credentials file, fdb uses unix-style paths,
+meaning that paths are assumed to be relative to the user&#8217;s namespace
+unless they are introduced with a leading slash.  Also, the about tag
+(fluiddb/about) may be referred to as /about.  This affects input and
+output.</p>
+<p>If you want to overrride this behaviour for a given command,
+you can use the <tt class="docutils literal"><span class="pre">-U</span></tt> flag to specify that the command will use
+unix-style paths, or <tt class="docutils literal"><span class="pre">-F</span></tt> to indicate that it will use fluidinfo-style
+paths.</p>
+</div>
+<div class="section" id="tests">
+<h2>Tests<a class="headerlink" href="#tests" title="Permalink to this headline">¶</a></h2>
+<p>The library includes a set of tests.   If you have valid credentials,
+and everything is OK, these should run successfully if you just execute
+the file fdb.py.</p>
+<p>See <a class="reference internal" href="#fdb-test">fdb test</a>.</p>
+</div>
+<div class="section" id="using-the-library">
+<h2>Using the Library<a class="headerlink" href="#using-the-library" title="Permalink to this headline">¶</a></h2>
+<p>Four ways of exploring the library are:</p>
+<blockquote>
+<ol class="arabic simple">
+<li>look at the tests (the ones in the class TestFluidDB)</li>
+<li>look at the blog (<a class="reference external" href="http://abouttag.blogspot.com">http://abouttag.blogspot.com</a>)</li>
+<li>read the function documentation in the source.</li>
+<li>look at and run example.py, which should print DADGAD and 10.</li>
+</ol>
+</blockquote>
+</div>
+<div class="section" id="documentation">
+<h2>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h2>
+<p>This documentation is included with the release in the <tt class="docutils literal"><span class="pre">doc</span></tt>
+subdirectory of with doc/build/html/index.html being the main
+web page.</p>
+</div>
+<div class="section" id="delicious">
+<h2>Delicious<a class="headerlink" href="#delicious" title="Permalink to this headline">¶</a></h2>
+<p>Also distributed with fdb itself is code for accessing delicious.com
+(<a class="reference external" href="http://del.icio.us/">http://del.icio.us/</a>, as was), and for migrating bookmarks and other
+data to FluidDB.   This also includes functionality for creating web
+homepages from delicious based on a home tag.   See the README-DELICIOUS
+file for details on this functionality.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">The fdb Command Line for Fluidinfo</a><ul>
+<li><a class="reference external" href="#a-brief-overview-of-fluidinfo">A Brief Overview of Fluidinfo</a></li>
+<li><a class="reference external" href="#overview-of-the-command-line">Overview of the Command Line</a></li>
+<li><a class="reference external" href="#the-fdb-abstraction">The fdb Abstraction</a></li>
+<li><a class="reference external" href="#the-anatomy-of-the-core-fdb-commands">The Anatomy of the core fdb Commands</a></li>
+<li><a class="reference external" href="#command-reference">Command Reference</a><ul>
+<li><a class="reference external" href="#fdb-tag">fdb tag</a></li>
+<li><a class="reference external" href="#fdb-untag">fdb untag</a></li>
+<li><a class="reference external" href="#fdb-show">fdb show</a></li>
+<li><a class="reference external" href="#fdb-tags">fdb tags</a></li>
+<li><a class="reference external" href="#fdb-count">fdb count</a></li>
+<li><a class="reference external" href="#fdb-ls">fdb ls</a></li>
+<li><a class="reference external" href="#fdb-su">fdb su</a></li>
+<li><a class="reference external" href="#fdb-whoami">fdb whoami</a></li>
+<li><a class="reference external" href="#fdb-pwd-fdb-pwn">fdb pwd / fdb pwn</a></li>
+<li><a class="reference external" href="#fdb-test">fdb test</a></li>
+<li><a class="reference external" href="#fdb-help">fdb help</a></li>
+<li><a class="reference external" href="#fdb-version">fdb <tt class="docutils literal"><span class="pre">--version</span></tt></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference external" href="#installation-and-configuration">Installation and Configuration</a><ul>
+<li><a class="reference external" href="#download">Download</a></li>
+<li><a class="reference external" href="#dependencies">Dependencies</a></li>
+<li><a class="reference external" href="#making-the-fdb-command-available">Making the fdb command available</a></li>
+<li><a class="reference external" href="#fdb-python-library-and-command-line">fdb Python Library and Command Line</a></li>
+<li><a class="reference external" href="#credentials">Credentials</a></li>
+<li><a class="reference external" href="#tag-conventions">Tag Conventions</a></li>
+<li><a class="reference external" href="#tests">Tests</a></li>
+<li><a class="reference external" href="#using-the-library">Using the Library</a></li>
+<li><a class="reference external" href="#documentation">Documentation</a></li>
+<li><a class="reference external" href="#delicious">Delicious</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="index.html"
+                                  title="previous chapter">Documentation for the fdb Command Line</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/cli.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+          <div id="searchbox" style="display: none">
+            <h3>Quick search</h3>
+              <form class="search" action="search.html" method="get">
+                <input type="text" name="q" size="18" />
+                <input type="submit" value="Go" />
+                <input type="hidden" name="check_keywords" value="yes" />
+                <input type="hidden" name="area" value="default" />
+              </form>
+              <p class="searchtip" style="font-size: 90%">
+              Enter search terms or a module, class or function name.
+              </p>
+          </div>
+          <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="index.html" title="Documentation for the fdb Command Line"
+             >previous</a> |</li>
+        <li><a href="index.html">fdb v2.04 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2011, Nicholas J. Radcliffe.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

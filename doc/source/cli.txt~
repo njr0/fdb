@@ -323,11 +323,10 @@ i.e. full Fluidinfo-style paths must be used inside the query.
 
 The command produces no output when successful, even if the tag did
 not exist.
-::
 
-    $ fdb untag -F -a "Eiffel Tower" ntoll/rating  
-    Failed to remove tag ntoll/rating from object with about="Eiffel Tower"
-    Error code 401 (UNAUTHORIZED)
+$ fdb untag -F -a "Eiffel Tower" ntoll/rating  
+Failed to remove tag ntoll/rating from object with about="Eiffel Tower"
+Error code 401 (UNAUTHORIZED)
 
 **NOTE**
 
@@ -493,17 +492,6 @@ potentially with additional information.
 
     ls [flags] [<namespace>|<tag>]
 
-**FLAGS**
-
-  * ``-l`` long listing (one per line; showing permissions)
-  * ``-g`` group listing (one per line; showing exception groups and permissions)
-  * ``-L`` longer listing (show full Fluidinfo-style permissions listing)
-  * ``-n`` list the namesace as an object, rather than the contents of the namespace
-  * ``-d`` same as ``-n``
-  * ``-R`` recursive (show contents of all subnamespaces, recursively)
-
-as well as the standard flags like ``-s`` etc.
-
 **EXAMPLES**
 
   #. List the tags in the user's namespace:
@@ -581,23 +569,28 @@ as well as the standard flags like ``-s`` etc.
     
       $ fdb ls -L njr/rating
     
-      njr/rating:
-
-      ABSTRACT TAG (/tags)
-        Write
-          update (metadata):  policy: closed; exceptions [njr]
-          delete (delete):    policy: closed; exceptions [njr]
-        Control
-          control (control):  policy: closed; exceptions [njr]
-
-      TAG (/tag-values)
-        Read
-          read (read):        policy: open; exceptions []
-        Write
-          create (tag):       policy: closed; exceptions [njr]
-          delete (untag):     policy: closed; exceptions [njr]
-        Control
-          control (control):  policy: closed; exceptions [njr]
+      Permissions for tag njr/rating:
+    
+      ABSTRACT TAG (/permissions/tag)
+    
+        WRITE
+          create (create):    policy: closed; exceptions: [njr]
+          update (metadata):  policy: closed; exceptions: [njr]
+          delete (delete)  :  policy: closed; exceptions: [njr]
+    
+        CONTROL
+          control (control):  policy: closed; exceptions: [njr]
+    
+      TAG (/permissions/tag-values):
+        READ
+          read (read):        policy: open; exceptions: []
+    
+        WRITE
+          create (tag):       policy: closed; exceptions: [njr]
+          delete (untag):     policy: closed; exceptions: [njr]
+    
+        CONTROL
+          control (control):  policy: closed; exceptions: [njr]
 
   #. Long listing for contents of namespace (``njr/index``):
      ::
@@ -607,7 +600,7 @@ as well as the standard flags like ``-s`` etc.
        trwcr--r--   class
      
   #. Long listing for a namespace itself (``njr/index``) (as opposed to
-     its contents),  including Fluidinfo-style permissions summary:
+     its contents):
      ::     
 
         $ fdb ls -ln njr/index
@@ -623,21 +616,6 @@ as well as the standard flags like ``-s`` etc.
     
       See the section on permissions for an explanation of the permissions
       string.
-
-  #. Longer listing for a namespace itself (``njr/index``) (as opposed to
-     its contents):
-     ::
-        $ fdb ls -Ld njr/index
-
-        NAMESPACE (/namespaces)
-          Read
-            list (read):        policy: open; exceptions []
-          Write
-            create (create):    policy: closed; exceptions [njr]
-            delete (delete):    policy: closed; exceptions [njr]
-          Control
-            control (control):  policy: closed; exceptions [njr]
-
 
   #. Long listing including group details (for tag ``njr/rating``)
      ::
@@ -685,64 +663,6 @@ as well as the standard flags like ``-s`` etc.
     
        CONTROL:
          control (control):  policy: closed; exceptions: [njr]
-
-  #. List contents of all subnamespaces (recursive descent):
-     ::
-
-       ls -R miro
-       miro:
-       bestsellers-1998-2010/    first_field_id            n_records                
-       bestsellers1998to2010/    first_record_id           next-field-about         
-       books/                    forename                  next-field-id            
-       class                     has-about-links           next_field_about         
-       consistent                has-field-numbers         next_field_id            
-       description               has-id-links              planets/                 
-       elements/                 has-record-numbers        rating                   
-       field-name                has_about_links           small/                   
-       field-number              has_field_numbers         surname                  
-       field_number              has_id_links              table-name               
-       first-field-about         has_record_numbers        testconvtag              
-       first-field-id            message                   testrating               
-       first-record-about        n-fields                  testtable/               
-       first-record-id           n-records                 type                     
-       first_field_about         n_fields                  unit                     
-
-       miro/bestsellers-1998-2010:
-       ASP                       db-next-record-about      rank                     
-       RRP                       db-record-number          title                    
-       author                    imprint                   value                    
-       binding                   productclass              volume                   
-       date                      publisher                
-
-       miro/bestsellers1998to2010:
-
-
-       miro/books:
-       author                    guardian-1000             year                     
-       db-next-record-about      surname                  
-       forename                  title                    
-
-       miro/elements:
-       AtomicWeight              Description               Period                   
-       BoilingPointC             Etymology                 RelativeAtomicMass       
-       BoilingPointF             Group                     Symbol                   
-       ChemicalSeries            MeltingPointC             Z                        
-       Colour                    MeltingPointKelvin        db-next-record-about     
-       Density                   Name                      db-record-number         
-
-       miro/planets:
-       Atmosphere                Mass                      OrbitalRadius            
-       Category                  Moons                     RotationPeriod           
-       EquatorialDiameter        Name                      db-next-record-about     
-       HasRings                  OrbitalEccentricity       db-record-number         
-       Inclination               OrbitalPeriod            
-
-       miro/small:
-       db-record-number    id                  intField           
-
-       miro/testtable:
-       db-next-record-about      db-record-number          i                        
-
     
 
 
@@ -900,7 +820,7 @@ somewhere on your ``PATH``.   For example:
 
   alias fdb='/path/to/fdb'
 
-or, if ``~/bin`` is on your ``PATH``:
+or, if `~/bin` is on your ``PATH``:
 ::
 
   cd ~/bin
@@ -953,15 +873,14 @@ Tag Conventions
 As from version 2.00, fdb uses absolute Fluidinfo-style paths all the time
 (i.e. you always specify the namespace and don't use a leading slash).
 You can explicitly mandate this also by adding the line
-::
 
-    unix-style-paths false
+unix-style-paths false
 
 in your credentials file (see above).
-If you instead set 
-::
 
-    unix-style-paths true
+If you instead set 
+
+unix-style-paths true
 
 on the third line of the credentials file, fdb uses unix-style paths,
 meaning that paths are assumed to be relative to the user's namespace
@@ -970,8 +889,8 @@ unless they are introduced with a leading slash.  Also, the about tag
 output.
 
 If you want to overrride this behaviour for a given command,
-you can use the ``-U`` flag to specify that the command will use
-unix-style paths, or ``-F`` to indicate that it will use fluidinfo-style
+you can use the -U flag to specify that the command will use
+unix-style paths, or -F to indicate that it will use fluidinfo-style
 paths.
 
 

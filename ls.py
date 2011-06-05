@@ -15,20 +15,22 @@ class PermissionDesc:
     def __init__(self, entity, path, actions, names):
         self.entity = entity
         self.path = path
-        self.actions = actions + [u'control']
-        self.names = names + [u'control']
+        self.actions = actions
+        self.names = names
 
 
 RAW_PERMS = {
     u'abstract-tag': PermissionDesc(u'abstract-tag', u'tags',
-                                   [u'update', u'delete'],
-                                   [u'metadata', u'delete']),
+                                    [u'update', u'delete', u'control'],
+                                    [u'metadata', u'delete', u'acontrol']),
     u'tag': PermissionDesc(u'tag', u'tag-values',
-                          [u'create', u'read', u'delete'],
-                          [u'tag', u'read', u'untag']),
+                           [u'create', u'read', u'delete', u'control'],
+                           [u'tag', u'read', u'untag', 'tcontrol']),
     u'namespace': PermissionDesc(u'namespace', u'namespaces',
-                                [u'create', u'update', u'delete', u'list'],
-                                [u'create', u'metadata', u'delete', u'read'])
+                                 [u'create', u'update', u'delete', u'list',
+                                  u'control'],
+                                 [u'create', u'metadata', u'delete', u'read',
+                                  u'control'])
 }
 
 RAW_PERM_ENTITIES = RAW_PERMS.keys()
@@ -47,7 +49,7 @@ class FDBPerm:
         self.ns = perm
 
 READ = FDBPerm(u'read')
-READ.tag_map({u'tag-values': [u'see', u'read']})
+READ.tag_map({u'tag-values': [u'read']})
 READ.namespace_map({u'namespaces': [u'list']})
 
 WRITE = FDBPerm(u'write')
@@ -62,6 +64,14 @@ ADMINISTER.namespace_map({u'namespaces': [u'update', u'delete']})
 def string_format(n):
     return u'%%-%ds' % n
 
+
+def len_exc(exceptions, owner):
+    return len(exceptions) - 1 if owner in exceptions else len(exceptions)
+
+
+def combined_status(list_):
+    L = list_[0]
+    return L if all(ell == L for ell in list_) else u'/'
 
 def to_string_grid(items, pageWidth=78, maxCols=9):
     if items == []:
@@ -141,13 +151,13 @@ class ExtendedFluidDB(fdb.FluidDB):
         return self.delete_namespace(u'/' + rootns)
 
     def list_sorted_ns(self, ns, long_=False, columns=True, recurse=False,
-                       prnt=False):
+                       prnt=False, longer=False):
         h = self.list_namespace(ns)
         return self.list_sorted_nshash(h, ns, long_, columns, recurse,
-                                       prnt=prnt)
+                                       prnt=prnt, longer=longer)
 
     def list_sorted_nshash(self, h, ns, long_=False, columns=True,
-                           recurse=False, prnt=False):
+                           recurse=False, prnt=False, longer=False):
         if type(h) == types.IntType:
             if h == STATUS.UNAUTHORIZED:
                 return u'Permission denied.'
@@ -164,11 +174,10 @@ class ExtendedFluidDB(fdb.FluidDB):
             fmt = string_format(max([len(item) for item in items]))
         if recurse:
             print u'\n%s:' % ns
-        if long_:
+        if long_ or longer:
             res = []
             for item in items:
-                r = u'%s   %s' % (self.perms_string(ns + u'/' +  fmt % item),
-                                 fmt % item)
+                r = self.full_perms(ns + u'/' + fmt % item, longer)
                 res.append(r)
                 if prnt:
                     print r
@@ -183,8 +192,9 @@ class ExtendedFluidDB(fdb.FluidDB):
                 print result
         if recurse:
             others = u'\n'.join([self.list_sorted_ns(u'%s/%s' % (ns, space),
-                                        long_, columns, recurse, prnt=prnt)
-                                        for space in spaces])
+                                                     long_, columns, recurse,
+                                                     prnt=prnt, longer=longer)
+                                 for space in spaces])
             return u'%s:\n%s\n\n%s' % (ns, result, others)
         else:
             return result
@@ -218,24 +228,82 @@ class ExtendedFluidDB(fdb.FluidDB):
         s = []
         owner = tag.split(u'/')[0]
         r = h[u'read']
-        writes = (h[u'tag'], h[u'untag'], h[u'metadata'], h[u'delete'])
+        a, t = h[u'acontrol'], h[u'tcontrol']
+        writes = (h[u'metadata'], h[u'delete'], h[u'tag'], h[u'untag'])
         ownerRead = (u'r' if r[u'policy'] == u'open'
                              or owner in r[u'exceptions']
                           else u'-')
         ownerWrites = [w[u'policy'] == u'open' or owner in w[u'exceptions']
                        for w in writes]
+        ownerControl = combined_status((self.control_status(t, owner),
+                                        self.control_status(a, owner)))
+        worldControlT = u'c' if t[u'policy'] == u'open' else u'-'
+        worldControlA = u'c' if a[u'policy'] == u'open' else u'-'
+        worldControl = (worldControlT if worldControlT == worldControlA
+                                      else u'/')
         worldRead = u'r' if r[u'policy'] == u'open' else u'-'
         worldWrites = [w[u'policy'] == u'open' for w in writes]
         ownerWrite = write_status(ownerWrites)
         worldWrite = write_status(worldWrites)
- 
-        return u'-%s%sc---%s%s-' % (ownerRead, ownerWrite,
-                                   worldRead, worldWrite)
+
+        groupRead = self.group_perm(u'r', r, owner)
+        groupWrite = combined_status([self.group_perm(u'w', w, owner)
+                                      for w in writes])
+        groupControl = combined_status([self.group_perm(u'c', c, owner)
+                                        for c in (a, t)])
+
+        return u't%s%s%s%s%s%s%s%s%s' % (ownerRead, ownerWrite, ownerControl,
+                                         groupRead, groupWrite, groupControl,
+                                         worldRead, worldWrite, worldControl)
+
+    def group_perm(self, code, perm, owner):
+        n = len_exc(perm[u'exceptions'], owner)
+        if perm[u'policy'] == u'closed':
+            return code if n > 0 else u'-'
+        else:
+            return u'-' if n > 0 else code
+
+    def control_status(self, perm, owner):
+        return (u'c' if perm[u'policy'] == u'open'
+                        or owner in perm[u'exceptions']
+                     else u'-')
+
+    def fi_tag_perms_string(self, tag):
+        h = self.get_tag_perms_hash(tag)
+        s = []
+        owner = tag.split(u'/')[0]
+        read = h[u'read']
+        writes = (u'metadata', u'delete', u'tag', u'untag')
+        controls = (h[u'acontrol'], h[u'tcontrol'])
+        for kind in (u'ABSTRACT TAG', u'TAG'):
+            desc = RAW_PERMS[u'tag' if kind == u'TAG' else u'abstract-tag']
+            s.append(kind + u' (/%s)' % desc.path)
+            if kind == u'TAG':
+                s.append(u'  Read')
+                s.append(u'    %-18s  %s' % (u'read (read):',
+                                             self.fi_perm_desc(h[u'read'])))
+            s.append(u'  Write')
+            for (fi, fdb) in zip(desc.actions, desc.names):
+                if fdb in writes:
+                    s.append(u'    %-18s  %s' % (u'%s (%s):' % (fi, fdb),
+                                                 self.fi_perm_desc(h[fdb])))
+            s.extend([u'  Control'])
+            s.append(u'    %-18s  %s' % (u'control (control):',
+                                         self.fi_perm_desc(h[desc.names[-1]])))
+            s.append(u'')
+        return u'\n'.join(s)
+
+    def fi_perm_desc(self, perm):
+        return (u'policy: %s; exceptions [%s]'
+                % (perm[u'policy'],
+                   u', '.join(u for u in perm[u'exceptions'])))
+
     def ns_perms_string(self, ns):
         h = self.get_ns_perms_hash(ns)
         s = []
         owner = ns.split(u'/')[0]
         r = h[u'read']
+        control = h[u'control']
         writes = (h[u'create'], h[u'metadata'], h[u'delete'])
         ownerRead = (u'r' if r[u'policy'] == u'open'
                              or owner in r[u'exceptions']
@@ -246,16 +314,59 @@ class ExtendedFluidDB(fdb.FluidDB):
         worldWrites = [w[u'policy'] == u'open' for w in writes]
         ownerWrite = write_status(ownerWrites)
         worldWrite = write_status(worldWrites)
- 
-        return u'n%s%sc---%s%s-' % (ownerRead, ownerWrite,
-                                   worldRead, worldWrite)
+        ownerControl = self.control_status(control, owner)
+        worldControl = u'c' if control[u'policy'] == u'open' else u'-'
+        groupRead = self.group_perm(u'r', r, owner)
+        groupWrite = combined_status([self.group_perm(u'w', w, owner)
+                                      for w in writes])
+        groupControl = self.group_perm(u'c', control, owner)
 
-    def perms_string(self, tagOrNS):
+        return u'n%s%s%s%s%s%s%s%s%s' % (ownerRead, ownerWrite, ownerControl,
+                                         groupRead, groupWrite, groupControl,
+                                         worldRead, worldWrite, worldControl)
+
+
+    def fi_ns_perms_string(self, ns):
+        h = self.get_ns_perms_hash(ns)
+        s = []
+        owner = ns.split(u'/')[0]
+        read = h[u'read']
+        writes = (u'create', u'update', u'delete')
+        desc = RAW_PERMS[u'namespace']
+        s.append(u'NAMESPACE (/%s)' % desc.path)
+        s.append(u'  Read')
+        s.append(u'    %-18s  %s' % (u'list (read):',
+                                     self.fi_perm_desc(h[u'read'])))
+        s.append(u'  Write')
+        for (fi, fdb) in zip(desc.actions, desc.names):
+            if fdb in writes:
+                s.append(u'    %-18s  %s' % (u'%s (%s):' % (fi, fdb),
+                                             self.fi_perm_desc(h[fdb])))
+        s.append(u'  Control')
+        s.append(u'    %-18s  %s' % (u'control (control):',
+                                     self.fi_perm_desc(h[u'control'])))
+        s.append(u'')
+        return u'\n'.join(s)
+
+    def perms_string(self, tagOrNS, longer=False):
         tagOrNS = tagOrNS.strip()
         if tagOrNS.endswith(u'/'):
-            return self.ns_perms_string(tagOrNS[:-1])
+            if longer:
+                return self.fi_ns_perms_string(tagOrNS[:-1])
+            else:
+                return self.ns_perms_string(tagOrNS[:-1])
         else:
-            return self.tag_perms_string(tagOrNS)
+            if longer:
+                return self.fi_tag_perms_string(tagOrNS)
+            else:
+                return self.tag_perms_string(tagOrNS)
+
+    def full_perms(self, tagOrNS, longer):
+        perms = self.perms_string(tagOrNS, longer)
+        if longer:
+            return u'\n%s:\n\n%s' % (tagOrNS, perms)
+        else:
+            return u'%s   %s' % (perms, tagOrNS)
                 
     def set_raw_perm(self, entity, name, action, policy, exceptions):
         assert entity in RAW_PERM_ENTITIES
@@ -281,102 +392,28 @@ def execute_ls_command(objs, tags, options):
     db = ExtendedFluidDB(host=options.hostname, credentials=credentials,
                          debug=options.debug,
                          unixStylePaths=fdblib.path_style(options))
-
     if len(tags) == 0:
-        fulltag = db.abs_tag_path(u'', inPref=True)[:-1]
-    else:
-        fulltag = db.abs_tag_path(tags[0], inPref=True)
+        tags = [(u'/' if db.unixStyle else u'') + db.credentials.username]
+    fulltag = db.abs_tag_path(tags[0], inPref=True)
     if options.namespace:
         if db.ns_exists(fulltag):
-            perms = ((db.perms_string(db.abs_tag_path(fulltag,
-                                                      inPref=True)[1:] + u'/')
-                     + u'   ') if options.long else u'')
-            nsResult = perms + tags[0]
+            if options.long or options.longer:
+                nsResult = db.full_perms(fulltag[1:] + u'/', options.longer)
+            else:
+                nsResult = fulltag
             print nsResult
         else:
             nsResult = u'Not Found'
     else:
         nsResult = db.list_sorted_ns(fulltag[1:], long_=options.long,
-                                     recurse=options.recurse, prnt=True)
+                                     recurse=options.recurse, prnt=True,
+                                     longer=options.longer)
     tagExists = db.tag_exists(fulltag)
     if nsResult == u'Error status 404':
         if not tagExists:
-            print u'%s not found' % db.abs_tag_path(fulltag, inPref=True)
+            print u'%s not found' % fulltag
     if tagExists:
-        perms = ((db.perms_string(db.abs_tag_path(fulltag, inPref=True)[1:])
-                  + u'   ') if options.long else u'')
-        print perms + tags[0]
-
-
-if __name__ == '__main__':
-    db = ExtendedFluidDB()
-    testdb = ExtendedFluidDB()
-    testdb.credentials = fdb.Credentials(u'test', u'test')
-
-    user = db.credentials.username
-    if 0:
-        assert db.set_raw_perm(u'tag', u'%s/rating' % user, u'read', u'open',
-                                [u'test']) == 0
-        print db.get_raw_perm(u'abstract-tag', u'%s/rating' % user, u'update')
-        print db.get_raw_perm(u'tag', u'%s/rating' % user, u'read')
-        print db.get_raw_perm(u'namespace', u'%s' % user, u'update')
-
-        assert (db.set_raw_perm(u'tag', u'%s/rating' % user, u'read', u'open', [])
-                == 0)
-        print db.get_raw_perm(u'tag', u'%s/rating' % user, u'read')
-
-    # First get rid of any existing namespace
-
-    print db.list_sorted_ns(u'njr', recurse=True)
-    r = db.rm_r(u'njr/test')
-    if r == fdb.STATUS.NOT_FOUND:
-        print u'Not found'
-    elif r == 0:
-        print u'deleted OK'
-    else:
-        print u'error', r
-
-    status, content = db.call(u'DELETE', u'/namespaces/%s/test' % user)
-    assert status in (fdb.STATUS.NO_CONTENT, fdb.STATUS.NOT_FOUND)
-    print u'Ensured namspace %s/test does not exist' % user
-
-    # Ensure namespace user/test exists and tag user/test/tag
-
-    id = db.tag_object_by_about(u'DADGAD', u'test/rating', 0)
-    assert id == 0
-    print u'%s/test/rating created / verified' % user
-    assert db.set_raw_perm(u'namespace', u'%s/test' % user, u'create', u'closed',
-                            [user]) == 0
-
-    p = db.get_raw_perm(u'namespace', u'%s/test' % user, u'create')
-    assert (p[u'policy'], p[u'exceptions']) == (u'closed', [user])
-    p = db.get_raw_perm(u'tag', u'%s/test/rating' % user, u'create')
-    assert (p[u'policy'], p[u'exceptions']) == (u'closed', [user])
-
-    # should fail
-    ok = testdb.tag_object_by_about(u'DADGAD', u'/%s/test/rating' % user, u'0')
-    assert ok == 0
-    print u'Test user correctly failed to write /%s/test/rating' % user
-
-    # now allow test to write namespace
-    assert db.set_raw_perm(u'namespace', u'%s/test' % user, u'create', u'closed',
-                            [user, u'test']) == 0
-    print (u'Test user should have create permission on namespace %s/test:'
-           % user)
-
-    p = db.get_raw_perm(u'namespace', u'%s/test' % user, u'create')
-    assert (p[u'policy'], set(p[u'exceptions'])) == (u'closed',
-                                                   set([user, u'test']))
-    print u'Test user *has* create permission on namespace %s/test:' % user
-
-    assert testdb.tag_object_by_about(u'DADGAD', u'/%s/test/rating2' % user,
-                                        u'0') == 0
-    print u'Test user succeeded in tagging with new %s/test/rating2' % user
-
-    status, content = db.call(u'DELETE', u'/tags/%s/test/rating2' % user)
-    assert status == fdb.STATUS.NO_CONTENT
-    print u'Tag %s/test/rating2 successfully deleted' % user
-
-    status, content = db.call(u'DELETE', u'/tags/%s/test/rating' % user)
-    assert status == fdb.STATUS.NO_CONTENT
-    print u'Tag %s/test/rating successfully deleted' % user
+        if options.long or options.longer:
+            print db.full_perms(fulltag[1:], options.longer)
+        else:
+            print tags[0]

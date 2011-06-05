@@ -6,7 +6,8 @@
 #               in the AUTHOR
 # Licence terms in LICENCE.
 
-__version__ = u'2.03'
+__version__ = u'2.04'
+VERSION = __version__
 
 import codecs
 import os
@@ -103,8 +104,18 @@ IDS_MAIN = {u'DADGAD': u'1fb8e9cb-70b9-4bd0-a7e7-880247384abd'}
 IDS_SAND = {u'DADGAD': DADGAD_ID}
 
 #DEFAULT_ENCODING = 'UTF-8'
-
 DEFAULT_ENCODING = sys.getfilesystemencoding()
+
+
+class UnicodeOut:
+    def __init__(self, std):
+        self.std = std
+
+    def write(self, msg):
+        self.std.write((msg.encode('UTF-8') if type(msg) == unicode else msg))
+            
+sys.stdout = UnicodeOut(sys.stdout)
+sys.stderr = UnicodeOut(sys.stderr)
 
 
 def quote_u_u(s):
@@ -963,3 +974,7 @@ def path_style(options):
 
 def version():
     return __version__
+
+
+def uprint(s):
+    print s.encode('UTF-8') if type(s) == unicode else s

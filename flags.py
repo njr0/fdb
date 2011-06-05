@@ -6,29 +6,33 @@
 import sys
 class FlagError (Exception):                    pass
 
-def Plural (n, s, pl=None, str=False, justTheWord=False):
+def Plural(n, s, pl=None, str=False, justTheWord=False):
     """Returns a string like '23 fields' or '1 field' where the
         number is n, the stem is s and the plural is either stem + 's'
         or stem + pl (if provided)."""
     smallints = ['zero', 'one', 'two', 'three', 'four', 'five',
                          'six', 'seven', 'eight', 'nine', 'ten']
 
+    isUnicode = type(s) == unicode
+    if isUnicode:
+        s = s.encode('UTF-8')
     if pl == None:
         pl = 's'
     if str and n < 10 and n >= 0:
         strNum = smallints[n]
     else:
-        strNum = int (n)
+        strNum = int(n)
     if n == 1:
         if justTheWord:
-            return s
+            result = s
         else:
-            return ('%s %s' % (strNum, s))
+            result ='%s %s' % (strNum, s)
     else:
         if justTheWord:
-            return '%s%s' % (s, pl)
+            result = '%s%s' % (s, pl)
         else:
-            return ('%s %s%s' % (strNum, s, pl))
+            result = '%s %s%s' % (strNum, s, pl)
+    return result.decode('UTF-8') if isUnicode else result
 
 class Flags:
     def __init__ (self, args, groupable=None, argless=None,

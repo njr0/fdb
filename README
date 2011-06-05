@@ -3,10 +3,10 @@
 FDB PYTHON LIBRARY
 ==================
 
-fdb is a primarily a library for providing access to the FluidDB database
-(http://fluidinfo.com/fluiddb) from Fluidinfo (http://fluidinfo.com/.)
+fdb is a primarily a command line tool for providing access to the
+Fluidinfo data store (from Fluidinfo (http://fluidinfo.com/.)
 There is lots of coverage of the library (and its evolution) at
-http://abouttag.blogspot.com/.
+http://blog.abouttag.com/.
 
 
 FDB COMMAND LINE ACCESS
@@ -19,7 +19,7 @@ See 'USING THE COMMAND LINE', below.
 DEPENDENCIES
 ============
 
-If you're running python 2.6, fdb.py should just run.   With earlier
+If you're running python 2.6, fdb should just run.   With earlier
 version of python, you need to get access to simplejson and httplib2.
 You can get simplejson from http://pypi.python.org/pypi/simplejson/
 and httplib2 from http://code.google.com/p/httplib2/.
@@ -80,13 +80,13 @@ TESTS
 
 The library includes a set of tests.   If you have valid credentials,
 and everything is OK, these should run successfully if you just execute
-the file fdb.py.   For example, at the time of writing this README file
-(version 0.8 of the fdb), I get this:
+the file fdb.   For example, at the time of writing this README file
+(version 2.03 of the fdb), I get this:
 
-$ python fdb.py
-....................
+$ fdb test
+......................
 ----------------------------------------------------------------------
-Ran 20 tests in 46.311s
+Ran 22 tests in 46.311s
 
 OK
 
@@ -104,26 +104,27 @@ Four ways of exploring the library are:
 USING THE COMMAND LINE
 ======================
 
-Commands can be run by giving arguments to fdb.py.
+Commands can be run by giving arguments to fdb.
 For a list of commands, use
 
-	python fdb.py help
+	fdb help
 
 An example command is
 
-python fdb.py show -a DADGAD rating /fluiddb/about
+python fdb show -a DADGAD rating /fluiddb/about
 
 Obviously, if you want to use fdb as a command from the shell, it will
 probably be convenient to use an alias or create a trivial shell script
 to run it.   I use bash, with the alias
 
-alias fdb='python ~/python/fluiddb/fdb.py'
+alias fdb='~/python/fluiddb/fdb'
 
 which allows me to type
 
 fdb show -a DADGAD rating /fluiddb/about
 
-etc.
+You can also put a link to fdb into some directpry (like ~/bin) on your
+``PATH``.
 
 
 DELICIOUS
