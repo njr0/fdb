@@ -6,7 +6,7 @@
 #               in the AUTHOR
 # Licence terms in LICENCE.
 
-__version__ = u'2.04'
+__version__ = u'2.05'
 VERSION = __version__
 
 import codecs
@@ -153,7 +153,7 @@ def by_about(f):
     def wrapper(self, about, *args, **kwargs):
         o = self.create_object(about=about)
         if type(o) == types.IntType:   # error code
-            return o
+            return o, None
         return f(self, o.id, *args, **kwargs)
     return wrapper
 
@@ -320,12 +320,11 @@ class FluidDB:
         if body:
             headers[u'content-type'] = u'application/json'
 
-        if True:
-            k2 = {}
-            for k in kw:
-                k2[k] = (kw[k].decode('UTF-8')
-                         if type(kw[k]) == types.StringType else kw[k])
-            kw = k2
+        k2 = {}
+        for k in kw:
+            k2[k] = (kw[k].decode('UTF-8')
+                     if type(kw[k]) == types.StringType else kw[k])
+        kw = k2
         url = self._get_url(self.host, path, hash, kw)
 
         if self.debug:
@@ -378,7 +377,7 @@ class FluidDB:
         if self.debug:
             print u'\nTag URL:', url
             print u'Value:', value
-        response, content = http.request(url, u'PUT', value,
+        response, content = http.request(url, u'PUT', value.encode('UTF-8'),
                                          headers)
         return response.status, content
 
@@ -523,7 +522,6 @@ class FluidDB:
             namespace = u'/%s/%s' % (user, subnamespace)
             id = self.create_namespace(namespace)
             if type(id) in types.StringTypes:  # is an ID
-                print id
                 (status, o) = self.call(u'POST', fullnamespace, fields)
             else:
                 raise FailedToCreateNamespaceError(u'FDB could not create'
@@ -619,7 +617,6 @@ class FluidDB:
            Returns list of tags.
         """
         obj = u'/objects/%s' % id
-        print obj
         status, (value, value_type) = self._get_tag_value(obj)
         if status == STATUS.OK:
             result = json.loads(value)

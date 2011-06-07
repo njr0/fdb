@@ -12,5 +12,8 @@ Contents:
    :maxdepth: 2
 
    cli.txt
+   unixlike.txt
+   install.txt
+
 
 

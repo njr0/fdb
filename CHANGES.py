@@ -240,3 +240,12 @@
 # 2011/06/05 v2.04     Completed ls command, adding ls -L
 #                      (well, -g still to add...)
 #                      Completed draft of complete documentation.
+#
+# 2011/06/05 v2.05     Added -g (group) flag to ls.
+#                      Added fdb perms command.
+#                      Completed first draft of full command line
+#                      which is now included in the distribution
+#                      and available online, hosted in Fluidinfo
+#                      itself/ at
+#                      http://fluiddb.fluidinfo.com/about/fdb/njr/index.html.
+

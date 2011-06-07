@@ -5,13 +5,13 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>The fdb Command Line for Fluidinfo &mdash; fdb v2.04 documentation</title>
+    <title>The fdb Command Line for Fluidinfo &mdash; fdb v2.05 documentation</title>
     <link rel="stylesheet" href="_static/default.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '',
-        VERSION:     '2.04',
+        VERSION:     '2.05',
         COLLAPSE_MODINDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -19,7 +19,8 @@
     </script>
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="fdb v2.04 documentation" href="index.html" />
+    <link rel="top" title="fdb v2.05 documentation" href="index.html" />
+    <link rel="next" title="Using Unix-Like Paths" href="unixlike.html" />
     <link rel="prev" title="Documentation for the fdb Command Line" href="index.html" /> 
   </head>
   <body>
@@ -30,9 +31,12 @@
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
         <li class="right" >
+          <a href="unixlike.html" title="Using Unix-Like Paths"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
           <a href="index.html" title="Documentation for the fdb Command Line"
              accesskey="P">previous</a> |</li>
-        <li><a href="index.html">fdb v2.04 documentation</a> &raquo;</li> 
+        <li><a href="index.html">fdb v2.05 documentation</a> &raquo;</li> 
       </ul>
     </div>  
 
@@ -532,6 +536,32 @@ on the tag.</li>
 </ul>
 </blockquote>
 </li>
+<li><p class="first">Group long listing for tag (<tt class="docutils literal"><span class="pre">njr/rating</span></tt>), including permissions
+summary.</p>
+<p>Let&#8217;s start with a tag with default permissions.</p>
+<div class="highlight-python"><pre>$ fdb ls -g private-tag
+trwcr--r--   (world)   njr/private-tag</pre>
+</div>
+<p>When no one has been given any unusual permissions, in effect
+there is no group; or to say it another way, group permissions
+can be considered to be the same as world permissions.</p>
+<p>Now let&#8217;s grant read and write access to <tt class="docutils literal"><span class="pre">jkakar</span></tt> and <tt class="docutils literal"><span class="pre">ntoll</span></tt></p>
+<div class="highlight-python"><pre>$ fdb perms group jkakar+ntoll njr/private-tag
+trwcrw----   ntoll+jkakar   njr/private-tag</pre>
+</div>
+<p>Group permission is now <tt class="docutils literal"><span class="pre">rw-</span></tt>, and the group is <tt class="docutils literal"><span class="pre">ntoll+jkakar</span></tt>.
+(The exception list also includes <tt class="docutils literal"><span class="pre">njr</span></tt>, of course.)</p>
+<p>Now let&#8217;s set different groups for read and write.
+We&#8217;ll let <tt class="docutils literal"><span class="pre">ntoll</span></tt> have write permission too.
+To do this we update the write-group:</p>
+<div class="highlight-python"><pre>$ fdb perms group-write ntoll private-tag
+$ fdb ls -g njr/private-tag
+trwcrw----   r:ntoll+jkakar  w:ntoll   njr/private-tag</pre>
+</div>
+<p>When the groups are different, they are shown separately,
+with <tt class="docutils literal"><span class="pre">r:</span></tt> prefixing the read group and <tt class="docutils literal"><span class="pre">w;</span></tt> prefixing the
+write group.</p>
+</li>
 <li><p class="first">Longer listing for tag (<tt class="docutils literal"><span class="pre">njr/rating</span></tt>), including Fluidinfo-style
 permissions summary:</p>
 <div class="highlight-python"><pre>$ fdb ls -L njr/rating
@@ -560,6 +590,17 @@ TAG (/tag-values)
 trwcr--r--   about
 trwcr--r--   class</pre>
 </div>
+</li>
+<li><p class="first">Group long listing for namespace (<tt class="docutils literal"><span class="pre">njr/private</span></tt>), including permissions
+summary.</p>
+<p>These are very similar to those for tags.   We&#8217;ll just looks at
+a namespace <tt class="docutils literal"><span class="pre">fi</span></tt></p>
+<div class="highlight-python"><pre>$ fdb ls -gd njr/fi
+nrwcrw-r--   r:(world)  w:terrycojones+paparent   njr/fi/</pre>
+</div>
+<p>This is showning that the namespace njr/fi has standard world read
+permissions (with no special group) but that <tt class="docutils literal"><span class="pre">terrycojones</span></tt>
+and <tt class="docutils literal"><span class="pre">paparent</span></tt> have write permission for the namespace.</p>
 </li>
 <li><p class="first">Long listing for a namespace itself (<tt class="docutils literal"><span class="pre">njr/index</span></tt>) (as opposed to
 its contents),  including Fluidinfo-style permissions summary:</p>
@@ -693,6 +734,148 @@ db-next-record-about      db-record-number          i</pre>
 </ol>
 </blockquote>
 </div>
+<div class="section" id="fdb-perms">
+<h3>fdb perms<a class="headerlink" href="#fdb-perms" title="Permalink to this headline">¶</a></h3>
+<p>The <tt class="docutils literal"><span class="pre">perms</span></tt> command provides a simple interface for changing the
+permissions on tags and namespaces.   It only supports five cases,
+but there are powerful enough to cover the vast bulk of common
+situations.</p>
+<p><strong>FORM</strong></p>
+<div class="highlight-python"><pre>fdb perms permissions-spec list-of-one-or-more-tags-or-namespaces</pre>
+</div>
+<p>Here <tt class="docutils literal"><span class="pre">permissions-spec</span></tt> can be</p>
+<blockquote>
+<ul class="simple">
+<li><tt class="docutils literal"><span class="pre">private</span></tt></li>
+<li><tt class="docutils literal"><span class="pre">default</span></tt></li>
+<li><tt class="docutils literal"><span class="pre">group</span> <span class="pre">list+of+usernames+separated+by+pluses</span></tt></li>
+<li><tt class="docutils literal"><span class="pre">group-write</span> <span class="pre">list+of+usernames+separated+by+pluses</span></tt></li>
+<li><tt class="docutils literal"><span class="pre">group-read</span> <span class="pre">list+of+usernames+separated+by+pluses</span></tt></li>
+</ul>
+</blockquote>
+<p><strong>EXAMPLES</strong></p>
+<p>The six cases are as follows and apply equally namespaces and tags.
+In what follows, we&#8217;ll use a <tt class="docutils literal"><span class="pre">rating</span></tt> tag and a namespace called <tt class="docutils literal"><span class="pre">friends</span></tt>.</p>
+<blockquote>
+<ul>
+<li><p class="first">Make a tag or namespace completely private.</p>
+<div class="highlight-python"><pre>$ fdb perms private njr/rating
+$ fdb perms private njr/fi</pre>
+</div>
+<p>We could also change them together by saying:</p>
+<div class="highlight-python"><pre>$ fdb perms private njr/rating njr/fi</pre>
+</div>
+<p>This sets the permissions so that only the owner of the tag
+or namespace has permission to do anything with it&#8212;<tt class="docutils literal"><span class="pre">read</span></tt>, <tt class="docutils literal"><span class="pre">write</span></tt>
+and <tt class="docutils literal"><span class="pre">control</span></tt> permission.
+The abbreviated view of this is shown by</p>
+<div class="highlight-python"><pre>$ fdb ls -ld njr/rating njr/fi
+trwc------   njr/rating
+nrwc------   njr/fi/</pre>
+</div>
+<p>(See <cite>fdb ls</cite> for an detailed explanation of the permissions codes.)</p>
+<p>The full listing after this is:</p>
+<div class="highlight-python"><pre>$ fdb -F ls -Ld njr/rating njr/fi
+
+njr/rating:
+
+ABSTRACT TAG (/tags)
+  Write
+    update (metadata):  policy: closed; exceptions = [njr]
+    delete (delete):    policy: closed; exceptions = [njr]
+  Control
+    control (control):  policy: closed; exceptions = [njr]
+
+TAG (/tag-values)
+  Read
+    read (read):        policy: closed; exceptions = [njr]
+  Write
+    create (tag):       policy: closed; exceptions = [njr]
+    delete (untag):     policy: closed; exceptions = [njr]
+  Control
+    control (control):  policy: closed; exceptions = [njr]
+
+
+njr/fi/:
+
+NAMESPACE (/namespaces)
+  Read
+    list (read):        policy: closed; exceptions = [njr]
+  Write
+    create (create):    policy: closed; exceptions = [njr]
+    delete (delete):    policy: closed; exceptions = [njr]
+  Control
+    control (control):  policy: closed; exceptions = [njr]</pre>
+</div>
+</li>
+<li><p class="first">Restore default permissions to a tag or namespace.
+The default is that the owner has read, write and control
+and everyone else has read only:</p>
+<div class="highlight-python"><pre>$ fdb perms default njr/rating njr/fi
+
+$ fdb -F ls -ld njr/rating njr/fi
+trwcr--r--   njr/rating
+nrwcr--r--   njr/fi/</pre>
+</div>
+</li>
+<li><p class="first">Set the permissions on a tag or namespace so that one or more extra people
+can write it.   (This does not alter read permissions.)</p>
+<div class="highlight-python"><pre>$ fdb perms group-write ntoll+jkakar njr/rating njr/fi
+
+$ fdb ls -gd njr/rating njr/fi
+fdb -F ls -gd njr/rating njr/fi
+trwcrw-r--   r:(world)  w:ntoll+jkakar   njr/rating
+nrwcrw-r--   r:(world)  w:ntoll+jkakar   njr/fi/</pre>
+</div>
+</li>
+<li><p class="first">Set the permissions so that only a particular group can read it,
+leaving write permissions as the are.</p>
+<div class="highlight-python"><pre>$ fdb perms default njr/rating njr/fi
+$ fdb perms group-read ntoll+jkakar+miro njr/rating njr/fi
+
+$ fdb -F ls -gd njr/rating njr/fi
+trwcr-----   r:ntoll+jkakar+miro  w:(world)   njr/rating
+nrwcr-----   r:ntoll+jkakar+miro  w:(world)   njr/fi/</pre>
+</div>
+</li>
+<li><p class="first">Set permissions so that one group of users can write tge tag
+or namespace, and another group can read it.
+In this case, let&#8217;s allow <tt class="docutils literal"><span class="pre">miro</span></tt> to write and <tt class="docutils literal"><span class="pre">ntoll</span></tt> and
+<tt class="docutils literal"><span class="pre">jkakar</span></tt> (as well as <tt class="docutils literal"><span class="pre">miro</span></tt>) to read.</p>
+<div class="highlight-python"><pre>$ fdb perms group-read ntoll+jkakar+miro njr/rating njr/fi
+$ fdb perms group-write miro njr/rating njr/fi
+
+$ fdb ls -gd njr/rating njr/fi
+trwcrw----   r:ntoll+jkakar+miro  w:miro   njr/rating
+nrwcrw----   r:ntoll+jkakar+miro  w:miro   njr/fi/</pre>
+</div>
+</li>
+<li><p class="first">The final case is really just a special case of the previous one,
+where the read and write groups are the same.
+Let&#8217;s make <tt class="docutils literal"><span class="pre">miro</span></tt> the only user (other the owner, <tt class="docutils literal"><span class="pre">njr</span></tt>)
+who can read or write the tag and namespace.</p>
+<div class="highlight-python"><pre>$ fdb perms group miro njr/rating njr/fi
+
+$ fdb ls -gd njr/rating njr/fi
+trwcrw----   miro   njr/rating
+nrwcrw----   miro   njr/fi/</pre>
+</div>
+</li>
+</ul>
+</blockquote>
+<p><strong>NOTE</strong></p>
+<p>Removing read access to a namespace prevents people from listing
+that namespace but does not stop them working with the contents
+of the namespace if they can find them.   So if you have a
+namespace called <tt class="docutils literal"><span class="pre">secret</span></tt> and set its permissions to
+<tt class="docutils literal"><span class="pre">nrwc------</span></tt> (owner-only access) and in it have a tag called
+<tt class="docutils literal"><span class="pre">password</span></tt> with its permission set to the default <tt class="docutils literal"><span class="pre">trwcr--r--</span></tt>
+then anyone will be able to read the password if they discover
+it exists.</p>
+<p>Note also that the <em>existence</em> of a tag cannot really be hidden
+in Fluidinfo, so people will be able to find out that you have
+a tag called <tt class="docutils literal"><span class="pre">secret/password</span></tt>.</p>
+</div>
 <div class="section" id="fdb-su">
 <h3>fdb su<a class="headerlink" href="#fdb-su" title="Permalink to this headline">¶</a></h3>
 <p>Set user: changes the set of credentials in use by <tt class="docutils literal"><span class="pre">fdb</span></tt>.</p>
@@ -748,7 +931,7 @@ namespace and a <tt class="docutils literal"><span class="pre">cd</span></tt> co
 user chooses to use unix-style paths with <tt class="docutils literal"><span class="pre">fdb</span></tt>.</p>
 </div>
 <div class="section" id="fdb-test">
-<h3>fdb test<a class="headerlink" href="#fdb-test" title="Permalink to this headline">¶</a></h3>
+<span id="fdbtest"></span><h3>fdb test<a class="headerlink" href="#fdb-test" title="Permalink to this headline">¶</a></h3>
 <p>Runs fdb&#8217;s self-tests.</p>
 <p><strong>FORM</strong></p>
 <div class="highlight-python"><pre>fdb test [flags] [subset to run]
@@ -771,124 +954,10 @@ Ran 22 tests in 47.210s</pre>
 <h3>fdb help<a class="headerlink" href="#fdb-help" title="Permalink to this headline">¶</a></h3>
 <p>Shows help information.</p>
 </div>
-<div class="section" id="fdb-version">
-<h3>fdb <tt class="docutils literal"><span class="pre">--version</span></tt><a class="headerlink" href="#fdb-version" title="Permalink to this headline">¶</a></h3>
-<p>Reports the version of fdb running; <tt class="docutils literal"><span class="pre">-V</span></tt> may be used as a short form.</p>
+<div class="section" id="fdb-v">
+<h3>fdb –V<a class="headerlink" href="#fdb-v" title="Permalink to this headline">¶</a></h3>
+<p>Reports the version of fdb running; <tt class="docutils literal"><span class="pre">--version</span></tt> may be used as a long form.</p>
 </div>
-</div>
-</div>
-<div class="section" id="installation-and-configuration">
-<h1>Installation and Configuration<a class="headerlink" href="#installation-and-configuration" title="Permalink to this headline">¶</a></h1>
-<p><strong>IMPORTANT CHANGE</strong> From version 2.00 onwards, Fluidinfo
-has become more conventional; see <cite>Tag Conventions</cite></p>
-<div class="section" id="download">
-<h2>Download<a class="headerlink" href="#download" title="Permalink to this headline">¶</a></h2>
-<p>fdb is available from Github at <a class="reference external" href="https://github.com/njr0/fdb">https://github.com/njr0/fdb</a> (use the
-download button).   Place fluiddb somewhere on your python path
-(environment variable <tt class="docutils literal"><span class="pre">PYTHONPATH</span></tt>).</p>
-</div>
-<div class="section" id="dependencies">
-<h2>Dependencies<a class="headerlink" href="#dependencies" title="Permalink to this headline">¶</a></h2>
-<p>If you&#8217;re running python 2.6, fdb.py should just run.   With earlier
-version of python, you need to get access to simplejson and httplib2.
-You can get simplejson from <a class="reference external" href="http://pypi.python.org/pypi/simplejson/">http://pypi.python.org/pypi/simplejson/</a>
-and httplib2 from <a class="reference external" href="http://code.google.com/p/httplib2/">http://code.google.com/p/httplib2/</a>.</p>
-</div>
-<div class="section" id="making-the-fdb-command-available">
-<h2>Making the fdb command available<a class="headerlink" href="#making-the-fdb-command-available" title="Permalink to this headline">¶</a></h2>
-<p>The file <tt class="docutils literal"><span class="pre">fdb</span></tt> included in the download is executable provided that
-a suitable python is installed.    You can make it available more
-conveniently by using a shell alias or adding a symbolic link to it
-somewhere on your <tt class="docutils literal"><span class="pre">PATH</span></tt>.   For example:</p>
-<div class="highlight-python"><pre>alias fdb='/path/to/fdb'</pre>
-</div>
-<p>or, if <tt class="docutils literal"><span class="pre">~/bin</span></tt> is on your <tt class="docutils literal"><span class="pre">PATH</span></tt>:</p>
-<div class="highlight-python"><pre>cd ~/bin
-ln -s /path/to/fdb</pre>
-</div>
-</div>
-<div class="section" id="fdb-python-library-and-command-line">
-<h2>fdb Python Library and Command Line<a class="headerlink" href="#fdb-python-library-and-command-line" title="Permalink to this headline">¶</a></h2>
-<p>fdb is a primarily a command line tool for providing access to the
-Fluidinfo data store (from Fluidinfo (<a class="reference external" href="http://fluidinfo.com/">http://fluidinfo.com/</a>.)
-There is lots of coverage of the library (and its evolution) at
-<a class="reference external" href="http://blog.abouttag.com/">http://blog.abouttag.com/</a>.</p>
-<p>fdb can also be used as a python library for accessing Fluidinfo, but
-it is less complete and less conventional the Ali Afshar&#8217;s FOM library
-(<a class="reference external" href="https://launchpad.net/fom">https://launchpad.net/fom</a>), which is generally preferred for
-programmatic use.</p>
-</div>
-<div class="section" id="credentials">
-<h2>Credentials<a class="headerlink" href="#credentials" title="Permalink to this headline">¶</a></h2>
-<p>For many operations, you also need an account on FluidDB,
-and credentials (a username and password).   You can get these from</p>
-<blockquote>
-<a class="reference external" href="http://fluidinfo.com/accounts/new">http://fluidinfo.com/accounts/new</a></blockquote>
-<p>fdb expects your credentials to be available in a two-line file
-in the format</p>
-<p>username
-password</p>
-<p>On Unix, the default location for this is ~/.fluidDBcredentials,
-and on Windows the default file is fluidDBcredentials.ini in your
-home folder.</p>
-<p>You can also optionally add a line, after password, saying either</p>
-<p>unix-style-paths true
-or unix-style-paths false</p>
-<p>(see next section)</p>
-</div>
-<div class="section" id="tag-conventions">
-<h2>Tag Conventions<a class="headerlink" href="#tag-conventions" title="Permalink to this headline">¶</a></h2>
-<p>As from version 2.00, fdb uses absolute Fluidinfo-style paths all the time
-(i.e. you always specify the namespace and don&#8217;t use a leading slash).
-You can explicitly mandate this also by adding the line</p>
-<div class="highlight-python"><pre>unix-style-paths false</pre>
-</div>
-<p>in your credentials file (see above).
-If you instead set</p>
-<div class="highlight-python"><pre>unix-style-paths true</pre>
-</div>
-<p>on the third line of the credentials file, fdb uses unix-style paths,
-meaning that paths are assumed to be relative to the user&#8217;s namespace
-unless they are introduced with a leading slash.  Also, the about tag
-(fluiddb/about) may be referred to as /about.  This affects input and
-output.</p>
-<p>If you want to overrride this behaviour for a given command,
-you can use the <tt class="docutils literal"><span class="pre">-U</span></tt> flag to specify that the command will use
-unix-style paths, or <tt class="docutils literal"><span class="pre">-F</span></tt> to indicate that it will use fluidinfo-style
-paths.</p>
-</div>
-<div class="section" id="tests">
-<h2>Tests<a class="headerlink" href="#tests" title="Permalink to this headline">¶</a></h2>
-<p>The library includes a set of tests.   If you have valid credentials,
-and everything is OK, these should run successfully if you just execute
-the file fdb.py.</p>
-<p>See <a class="reference internal" href="#fdb-test">fdb test</a>.</p>
-</div>
-<div class="section" id="using-the-library">
-<h2>Using the Library<a class="headerlink" href="#using-the-library" title="Permalink to this headline">¶</a></h2>
-<p>Four ways of exploring the library are:</p>
-<blockquote>
-<ol class="arabic simple">
-<li>look at the tests (the ones in the class TestFluidDB)</li>
-<li>look at the blog (<a class="reference external" href="http://abouttag.blogspot.com">http://abouttag.blogspot.com</a>)</li>
-<li>read the function documentation in the source.</li>
-<li>look at and run example.py, which should print DADGAD and 10.</li>
-</ol>
-</blockquote>
-</div>
-<div class="section" id="documentation">
-<h2>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h2>
-<p>This documentation is included with the release in the <tt class="docutils literal"><span class="pre">doc</span></tt>
-subdirectory of with doc/build/html/index.html being the main
-web page.</p>
-</div>
-<div class="section" id="delicious">
-<h2>Delicious<a class="headerlink" href="#delicious" title="Permalink to this headline">¶</a></h2>
-<p>Also distributed with fdb itself is code for accessing delicious.com
-(<a class="reference external" href="http://del.icio.us/">http://del.icio.us/</a>, as was), and for migrating bookmarks and other
-data to FluidDB.   This also includes functionality for creating web
-homepages from delicious based on a home tag.   See the README-DELICIOUS
-file for details on this functionality.</p>
 </div>
 </div>
 
@@ -912,27 +981,15 @@ file for details on this functionality.</p>
 <li><a class="reference external" href="#fdb-tags">fdb tags</a></li>
 <li><a class="reference external" href="#fdb-count">fdb count</a></li>
 <li><a class="reference external" href="#fdb-ls">fdb ls</a></li>
+<li><a class="reference external" href="#fdb-perms">fdb perms</a></li>
 <li><a class="reference external" href="#fdb-su">fdb su</a></li>
 <li><a class="reference external" href="#fdb-whoami">fdb whoami</a></li>
 <li><a class="reference external" href="#fdb-pwd-fdb-pwn">fdb pwd / fdb pwn</a></li>
 <li><a class="reference external" href="#fdb-test">fdb test</a></li>
 <li><a class="reference external" href="#fdb-help">fdb help</a></li>
-<li><a class="reference external" href="#fdb-version">fdb <tt class="docutils literal"><span class="pre">--version</span></tt></a></li>
+<li><a class="reference external" href="#fdb-v">fdb –V</a></li>
 </ul>
 </li>
-</ul>
-</li>
-<li><a class="reference external" href="#installation-and-configuration">Installation and Configuration</a><ul>
-<li><a class="reference external" href="#download">Download</a></li>
-<li><a class="reference external" href="#dependencies">Dependencies</a></li>
-<li><a class="reference external" href="#making-the-fdb-command-available">Making the fdb command available</a></li>
-<li><a class="reference external" href="#fdb-python-library-and-command-line">fdb Python Library and Command Line</a></li>
-<li><a class="reference external" href="#credentials">Credentials</a></li>
-<li><a class="reference external" href="#tag-conventions">Tag Conventions</a></li>
-<li><a class="reference external" href="#tests">Tests</a></li>
-<li><a class="reference external" href="#using-the-library">Using the Library</a></li>
-<li><a class="reference external" href="#documentation">Documentation</a></li>
-<li><a class="reference external" href="#delicious">Delicious</a></li>
 </ul>
 </li>
 </ul>
@@ -940,6 +997,9 @@ file for details on this functionality.</p>
             <h4>Previous topic</h4>
             <p class="topless"><a href="index.html"
                                   title="previous chapter">Documentation for the fdb Command Line</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="unixlike.html"
+                                  title="next chapter">Using Unix-Like Paths</a></p>
             <h3>This Page</h3>
             <ul class="this-page-menu">
               <li><a href="_sources/cli.txt"
@@ -969,9 +1029,12 @@ file for details on this functionality.</p>
           <a href="genindex.html" title="General Index"
              >index</a></li>
         <li class="right" >
+          <a href="unixlike.html" title="Using Unix-Like Paths"
+             >next</a> |</li>
+        <li class="right" >
           <a href="index.html" title="Documentation for the fdb Command Line"
              >previous</a> |</li>
-        <li><a href="index.html">fdb v2.04 documentation</a> &raquo;</li> 
+        <li><a href="index.html">fdb v2.05 documentation</a> &raquo;</li> 
       </ul>
     </div>
     <div class="footer">

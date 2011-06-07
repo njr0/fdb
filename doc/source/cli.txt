@@ -206,10 +206,9 @@ what tags to set.   Tag value pairs usually take the form:
 so that a list of them might be
 ::
 
-    rating=9 description="fabulous" seen=true price = 18.77
+    rating=9 description="fabulous" seen=true price=18.77
 
-(fdb is not too fussy about whether you put spaces around equals signs
-or not.)
+Don't put spaces around equals signs assigning tag values: it won't work.
 
 In general, strings should be in double quotes ``"like this"``,
 booleans should be ``true``,
@@ -237,7 +236,7 @@ specified.
 ::
 
     fdb tag -a "Eiffel Tower" njr/rating=7 njr/seen
-    fdb tag -a "Eiffel Tower" njr/rating = 7 njr/seen
+    fdb tag -a "Eiffel Tower" njr/rating=7 njr/seen
     fdb tag -i 93bd1999-0998-49cc-8004-af457ce34ce4 njr/rating=7 njr/seen
     fdb tag -q 'fluiddb/about matches "Eiffel Tower"' njr/rating=7 njr/seen
     fdb tag -U -a "Eiffel Tower" rating=7 seen
@@ -575,6 +574,42 @@ as well as the standard flags like ``-s`` etc.
         has read permission but not write or control permission
         on the tag.
 
+  #. Group long listing for tag (``njr/rating``), including permissions
+     summary.
+
+     Let's start with a tag with default permissions.
+     ::
+
+        $ fdb ls -g private-tag
+        trwcr--r--   (world)   njr/private-tag
+
+     When no one has been given any unusual permissions, in effect
+     there is no group; or to say it another way, group permissions
+     can be considered to be the same as world permissions.
+
+     Now let's grant read and write access to ``jkakar`` and ``ntoll``
+     ::
+
+        $ fdb perms group jkakar+ntoll njr/private-tag
+        trwcrw----   ntoll+jkakar   njr/private-tag
+
+     Group permission is now ``rw-``, and the group is ``ntoll+jkakar``.
+     (The exception list also includes ``njr``, of course.)
+
+     Now let's set different groups for read and write.
+     We'll let ``ntoll`` have write permission too.
+     To do this we update the write-group:
+     ::
+
+        $ fdb perms group-write ntoll private-tag
+        $ fdb ls -g njr/private-tag
+        trwcrw----   r:ntoll+jkakar  w:ntoll   njr/private-tag
+
+     When the groups are different, they are shown separately,
+     with ``r:`` prefixing the read group and ``w;`` prefixing the
+     write group.
+    
+
   #. Longer listing for tag (``njr/rating``), including Fluidinfo-style
      permissions summary:
      ::
@@ -606,6 +641,20 @@ as well as the standard flags like ``-s`` etc.
        trwcr--r--   about
        trwcr--r--   class
      
+  #. Group long listing for namespace (``njr/private``), including permissions
+     summary.
+
+     These are very similar to those for tags.   We'll just looks at
+     a namespace ``fi``
+     ::
+
+        $ fdb ls -gd njr/fi
+        nrwcrw-r--   r:(world)  w:terrycojones+paparent   njr/fi/
+
+     This is showning that the namespace njr/fi has standard world read
+     permissions (with no special group) but that ``terrycojones``
+     and ``paparent`` have write permission for the namespace.
+
   #. Long listing for a namespace itself (``njr/index``) (as opposed to
      its contents),  including Fluidinfo-style permissions summary:
      ::     
@@ -627,6 +676,7 @@ as well as the standard flags like ``-s`` etc.
   #. Longer listing for a namespace itself (``njr/index``) (as opposed to
      its contents):
      ::
+
         $ fdb ls -Ld njr/index
 
         NAMESPACE (/namespaces)
@@ -746,6 +796,165 @@ as well as the standard flags like ``-s`` etc.
     
 
 
+fdb perms
+*********
+
+The ``perms`` command provides a simple interface for changing the
+permissions on tags and namespaces.   It only supports five cases,
+but there are powerful enough to cover the vast bulk of common
+situations.
+
+**FORM**
+::
+
+    fdb perms permissions-spec list-of-one-or-more-tags-or-namespaces
+
+Here ``permissions-spec`` can be
+
+  * ``private``
+  * ``default``
+  * ``group list+of+usernames+separated+by+pluses``
+  * ``group-write list+of+usernames+separated+by+pluses``
+  * ``group-read list+of+usernames+separated+by+pluses``
+
+**EXAMPLES**
+
+The six cases are as follows and apply equally namespaces and tags.
+In what follows, we'll use a ``rating`` tag and a namespace called ``friends``.
+
+  * Make a tag or namespace completely private.
+    ::
+
+        $ fdb perms private njr/rating
+	$ fdb perms private njr/fi
+
+    We could also change them together by saying:
+    ::
+
+        $ fdb perms private njr/rating njr/fi
+
+    This sets the permissions so that only the owner of the tag
+    or namespace has permission to do anything with it---``read``, ``write``
+    and ``control`` permission.
+    The abbreviated view of this is shown by
+    ::
+
+        $ fdb ls -ld njr/rating njr/fi
+        trwc------   njr/rating
+        nrwc------   njr/fi/
+
+    (See `fdb ls` for an detailed explanation of the permissions codes.)
+
+    The full listing after this is:
+    ::
+
+        $ fdb -F ls -Ld njr/rating njr/fi
+
+        njr/rating:
+
+        ABSTRACT TAG (/tags)
+          Write
+            update (metadata):  policy: closed; exceptions = [njr]
+            delete (delete):    policy: closed; exceptions = [njr]
+          Control
+            control (control):  policy: closed; exceptions = [njr]
+
+        TAG (/tag-values)
+          Read
+            read (read):        policy: closed; exceptions = [njr]
+          Write
+            create (tag):       policy: closed; exceptions = [njr]
+            delete (untag):     policy: closed; exceptions = [njr]
+          Control
+            control (control):  policy: closed; exceptions = [njr]
+
+
+        njr/fi/:
+
+        NAMESPACE (/namespaces)
+          Read
+            list (read):        policy: closed; exceptions = [njr]
+          Write
+            create (create):    policy: closed; exceptions = [njr]
+            delete (delete):    policy: closed; exceptions = [njr]
+          Control
+            control (control):  policy: closed; exceptions = [njr]
+
+  * Restore default permissions to a tag or namespace.
+    The default is that the owner has read, write and control
+    and everyone else has read only:
+    ::
+
+        $ fdb perms default njr/rating njr/fi
+
+        $ fdb -F ls -ld njr/rating njr/fi
+        trwcr--r--   njr/rating
+        nrwcr--r--   njr/fi/
+
+  * Set the permissions on a tag or namespace so that one or more extra people
+    can write it.   (This does not alter read permissions.)
+    ::
+
+        $ fdb perms group-write ntoll+jkakar njr/rating njr/fi
+
+        $ fdb ls -gd njr/rating njr/fi
+        fdb -F ls -gd njr/rating njr/fi
+        trwcrw-r--   r:(world)  w:ntoll+jkakar   njr/rating
+        nrwcrw-r--   r:(world)  w:ntoll+jkakar   njr/fi/
+
+  * Set the permissions so that only a particular group can read it,
+    leaving write permissions as the are.
+    ::
+
+        $ fdb perms default njr/rating njr/fi
+        $ fdb perms group-read ntoll+jkakar+miro njr/rating njr/fi
+
+        $ fdb -F ls -gd njr/rating njr/fi
+        trwcr-----   r:ntoll+jkakar+miro  w:(world)   njr/rating
+        nrwcr-----   r:ntoll+jkakar+miro  w:(world)   njr/fi/
+
+  * Set permissions so that one group of users can write tge tag
+    or namespace, and another group can read it.
+    In this case, let's allow ``miro`` to write and ``ntoll`` and
+    ``jkakar`` (as well as ``miro``) to read.
+    ::
+
+        $ fdb perms group-read ntoll+jkakar+miro njr/rating njr/fi
+        $ fdb perms group-write miro njr/rating njr/fi
+
+        $ fdb ls -gd njr/rating njr/fi
+        trwcrw----   r:ntoll+jkakar+miro  w:miro   njr/rating
+        nrwcrw----   r:ntoll+jkakar+miro  w:miro   njr/fi/
+
+  * The final case is really just a special case of the previous one,
+    where the read and write groups are the same.
+    Let's make ``miro`` the only user (other the owner, ``njr``)
+    who can read or write the tag and namespace.
+    ::
+
+        $ fdb perms group miro njr/rating njr/fi
+
+        $ fdb ls -gd njr/rating njr/fi
+        trwcrw----   miro   njr/rating
+        nrwcrw----   miro   njr/fi/
+
+**NOTE**
+
+Removing read access to a namespace prevents people from listing
+that namespace but does not stop them working with the contents
+of the namespace if they can find them.   So if you have a
+namespace called ``secret`` and set its permissions to
+``nrwc------`` (owner-only access) and in it have a tag called
+``password`` with its permission set to the default ``trwcr--r--``
+then anyone will be able to read the password if they discover
+it exists.
+
+Note also that the *existence* of a tag cannot really be hidden
+in Fluidinfo, so people will be able to find out that you have
+a tag called ``secret/password``.
+
+
+
 fdb su
 ******
 
@@ -821,6 +1030,8 @@ namespace and a ``cd`` command; this is only really relevant if the
 user chooses to use unix-style paths with ``fdb``.
 
 
+.. _fdbtest:
+
 fdb test
 ********
 
@@ -858,161 +1069,11 @@ fdb help
 Shows help information.
 
 
-fdb ``--version``
-*****************
+fdb –V
+******
 
-Reports the version of fdb running; ``-V`` may be used as a short form.
-
-
+Reports the version of fdb running; ``--version`` may be used as a long form.
 
 
-Installation and Configuration
-==============================
-
-**IMPORTANT CHANGE** From version 2.00 onwards, Fluidinfo
-has become more conventional; see `Tag Conventions`
-
-Download
---------
-
-fdb is available from Github at https://github.com/njr0/fdb (use the
-download button).   Place fluiddb somewhere on your python path
-(environment variable ``PYTHONPATH``).
-
-
-Dependencies
-------------
-
-If you're running python 2.6, fdb.py should just run.   With earlier
-version of python, you need to get access to simplejson and httplib2.
-You can get simplejson from http://pypi.python.org/pypi/simplejson/
-and httplib2 from http://code.google.com/p/httplib2/.
-
-
-Making the fdb command available
---------------------------------
-
-The file ``fdb`` included in the download is executable provided that
-a suitable python is installed.    You can make it available more
-conveniently by using a shell alias or adding a symbolic link to it
-somewhere on your ``PATH``.   For example:
-::
-
-  alias fdb='/path/to/fdb'
-
-or, if ``~/bin`` is on your ``PATH``:
-::
-
-  cd ~/bin
-  ln -s /path/to/fdb
-
-
-
-fdb Python Library and Command Line
------------------------------------
-
-fdb is a primarily a command line tool for providing access to the
-Fluidinfo data store (from Fluidinfo (http://fluidinfo.com/.)
-There is lots of coverage of the library (and its evolution) at
-http://blog.abouttag.com/.
-
-fdb can also be used as a python library for accessing Fluidinfo, but
-it is less complete and less conventional the Ali Afshar's FOM library
-(https://launchpad.net/fom), which is generally preferred for
-programmatic use.
-
-
-Credentials
------------
-
-For many operations, you also need an account on FluidDB,
-and credentials (a username and password).   You can get these from
-
-    http://fluidinfo.com/accounts/new
-
-fdb expects your credentials to be available in a two-line file
-in the format
-
-username
-password
-
-On Unix, the default location for this is ~/.fluidDBcredentials,
-and on Windows the default file is fluidDBcredentials.ini in your
-home folder.
-
-You can also optionally add a line, after password, saying either
-
-unix-style-paths true
-or unix-style-paths false
-
-(see next section)
-
-Tag Conventions
----------------
-
-As from version 2.00, fdb uses absolute Fluidinfo-style paths all the time
-(i.e. you always specify the namespace and don't use a leading slash).
-You can explicitly mandate this also by adding the line
-::
-
-    unix-style-paths false
-
-in your credentials file (see above).
-If you instead set 
-::
-
-    unix-style-paths true
-
-on the third line of the credentials file, fdb uses unix-style paths,
-meaning that paths are assumed to be relative to the user's namespace
-unless they are introduced with a leading slash.  Also, the about tag
-(fluiddb/about) may be referred to as /about.  This affects input and
-output.
-
-If you want to overrride this behaviour for a given command,
-you can use the ``-U`` flag to specify that the command will use
-unix-style paths, or ``-F`` to indicate that it will use fluidinfo-style
-paths.
-
-
-Tests
------
-
-The library includes a set of tests.   If you have valid credentials,
-and everything is OK, these should run successfully if you just execute
-the file fdb.py.   
-
-See `fdb test`_.
-
-
-Using the Library
------------------
-
-Four ways of exploring the library are:
-
-  1. look at the tests (the ones in the class TestFluidDB)
-
-  2. look at the blog (http://abouttag.blogspot.com)
-
-  3. read the function documentation in the source.
-
-  4. look at and run example.py, which should print DADGAD and 10.
-
-
-Documentation
--------------
-
-This documentation is included with the release in the ``doc``
-subdirectory of with doc/build/html/index.html being the main
-web page.
-
-Delicious
----------
-
-Also distributed with fdb itself is code for accessing delicious.com
-(http://del.icio.us/, as was), and for migrating bookmarks and other
-data to FluidDB.   This also includes functionality for creating web
-homepages from delicious based on a home tag.   See the README-DELICIOUS
-file for details on this functionality.
 
 

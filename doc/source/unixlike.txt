@@ -1,0 +1,98 @@
+Using Unix-Like Paths
+=====================
+
+In Fluidinfo, all paths (namespaces and tags) are absolute and have no
+leading slash.  So ``njr`'s rating tag is ``njr/rating`` and must
+always be specified as such.
+
+This contrasts with Unix, where there is a notion of relative and absolute
+paths.   Absolute paths start with a slash and specify how to get to
+the item you are interested in.   So, if we map namespaces to directories
+and tags to files, then the unix equivalent of ``njr/rating`` is
+``/njr/rating``.   But Unix also has a notion of a ``current working
+directory`` (``cwd``) and relative paths---the path to the file or directory
+of interest relative to the working directory.   Thus if the ``cwd`` is
+``njr``, then ``/njr/rating`` can be referred to as ``rating``.
+Unix uses the ``cd`` command to allow you to change your working directory,
+and ``pwd`` to print the name of the working directory.
+
+``fdb`` supports a limited version of the same.   There are two ways
+to tell ``fdb`` that you would like to use unix-style paths rather than
+fluidinfo-style paths.   First, on any command line, you can add
+a ``-U`` flag, and this will have the desired effect for that command only.
+Thus
+::
+
+    ls -l njr/rating
+
+and
+::
+
+    ls -F -l rating
+
+have the same effect.  (The ``-F`` and ``-l`` can also be combined as
+``-lF`` or ``-Fl`` since they are single letter flags that don't take
+arguments.)
+
+Alternatively, if you would always like to use unix-style paths,
+you can add a third line to your `Credentials` file saying
+::
+
+  unix-style-paths true
+
+What Changes with Unix-Style Paths
+----------------------------------
+
+If you choose to use unix-style paths, the following changes occur:
+
+  * All paths not beginning with a ``/`` are taken to be relative
+    to the user's namespace.   So if you authenticate as ``njr``,
+    then ``rating`` is a shorthand for ``/njr/rating``
+    (the Fluidinfo tag ``njr/rating``),
+    ``private/rating`` is a shorthand for ``/njr/private/rating``.
+
+  * Paths in other users' namespaces must be introduced with a slash.
+    Thus, to refer to ``jacqui``'s rating, use ``/jacqui/rating`` etc.
+    For example,
+    ::
+
+       fdb show -a DADGAD rating /jacqui/rating
+
+    will request the Fluidinfo tags ``njr/rating`` and ``jacqui/rating``.
+
+  * The *about tag*, ``fluiddb/about`` may be referred to with the
+    special abbreviation ``/about``.
+    For example,
+    ::
+
+       fdb show -a DADGAD rating /jacqui/rating /about
+
+    (though requesting the about tag for an object specified by about
+    tag is obviously a bit pointless).
+
+  * The pseudo-tag ``/id`` may be used to request the object's ID.
+
+  * The exception to this is in the body of queries: ``fdb`` does not
+    rewrite queries, which are passed directly to Fluidinfo.
+    Thus, to request the about tags for all objects containing DADGAD,
+    you would say:
+    ::
+
+       fdb show -q 'fluiddb/about matches "DADGAD"' /about
+
+    Similarly, to request all objects ``njr`` has rated 10:
+    ::
+
+       fdb show -q 'njr/rating = 10' /about 
+
+**NOTES**
+
+  * At present, although there is a ``pwd`` command, it always simply
+    returns the authenticated user's username; there is no ``cd``
+    command at present.   This may change.
+
+  * It is quite likely that at some point in the future, when unix paths
+    are in use, ``fdb`` will rewrite queries too, i.e. unix-style
+    paths will be extended to the query; however, that is a slightly more
+    delicate operation, so hasn't been tackled yet.
+

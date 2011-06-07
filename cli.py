@@ -223,7 +223,7 @@ def execute_show_command(objs, db, tags, options):
                 print u'  %s' % cli_bracket(u'tag %s not present' % outtag)
             else:
                 print cli_bracket(u'error code %s getting tag %s'
-                                  % (error_code(status), uttag))
+                                  % (error_code(status), outtag))
 
 
 def execute_tags_command(objs, db, options):
@@ -422,6 +422,9 @@ def parse_args(args=None):
     general.add_option(u'-L', u'--longer', action=u'store_true',
                        default=False,
             help=u'longer listing (for ls).')
+    general.add_option(u'-g', u'--group', action=u'store_true',
+                       default=False,
+            help=u'long listing with groups (for ls).')
     general.add_option(u'-d', u'--namespace', action=u'store_true',
                        default=False,
             help=u'don\'t list namespace; just name of namespace.')
@@ -490,6 +493,10 @@ def execute_command_line(action, args, options, parser):
         command(objs, db, args, options)
     elif action == u'ls':
         ls.execute_ls_command(objs, args, options)
+    elif action == u'chmod':
+        ls.execute_chmod_command(objs, args, options)
+    elif action == u'perms':
+        ls.execute_perms_command(objs, args, options)
     elif action in (u'pwd', u'pwn', u'whoami'):
         execute_whoami_command(db)
     elif action == u'su':

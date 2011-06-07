@@ -373,14 +373,14 @@ class TestCLI(unittest.TestCase):
         self.tagTest('about', verbose=False)
         self.showTaggedSuccessTest('about')
 
-    def testUntagByAboutVerboseShow(self):
+    def atestUntagByAboutVerboseShow(self):
         self.untagTest('about')
         self.showUntagSuccessTest('about')
 
-    def testUntagByIDVerboseShow(self):
+    def atestUntagByIDVerboseShow(self):
         self.untagTest('id')
         self.showUntagSuccessTest('id')
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(verbosity=2)
 

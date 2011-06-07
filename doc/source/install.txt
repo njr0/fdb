@@ -1,0 +1,150 @@
+Installation and Configuration
+==============================
+
+**IMPORTANT CHANGE** From version 2.00 onwards, Fluidinfo
+has become more conventional; see `Tag Conventions`
+
+Download
+--------
+
+fdb is available from Github at https://github.com/njr0/fdb (use the
+download button).   Place fluiddb somewhere on your python path
+(environment variable ``PYTHONPATH``).
+
+
+Dependencies
+------------
+
+If you're running python 2.6, fdb.py should just run.   With earlier
+version of python, you need to get access to simplejson and httplib2.
+You can get simplejson from http://pypi.python.org/pypi/simplejson/
+and httplib2 from http://code.google.com/p/httplib2/.
+
+
+Making the fdb command available
+--------------------------------
+
+The file ``fdb`` included in the download is executable provided that
+a suitable python is installed.    You can make it available more
+conveniently by using a shell alias or adding a symbolic link to it
+somewhere on your ``PATH``.   For example:
+::
+
+  alias fdb='/path/to/fdb'
+
+or, if ``~/bin`` is on your ``PATH``:
+::
+
+  cd ~/bin
+  ln -s /path/to/fdb
+
+
+
+The fdb Python Library and Command Line
+---------------------------------------
+
+fdb is a primarily a command line tool for providing access to the
+Fluidinfo data store (from Fluidinfo (http://fluidinfo.com/.)
+There is lots of coverage of the library (and its evolution) at
+http://blog.abouttag.com/.
+
+fdb can also be used as a python library for accessing Fluidinfo, but
+it is less complete and less conventional the Ali Afshar's FOM library
+(https://launchpad.net/fom), which is generally preferred for
+programmatic use.
+
+
+Credentials
+-----------
+
+For many operations, you also need an account on FluidDB,
+and credentials (a username and password).   You can get these from
+
+    http://fluidinfo.com/accounts/new
+
+fdb expects your credentials to be available in a two-line file
+in the format
+
+username
+password
+
+On Unix, the default location for this is ~/.fluidDBcredentials,
+and on Windows the default file is fluidDBcredentials.ini in your
+home folder.
+
+You can also optionally add a line, after password, saying either
+
+unix-style-paths true
+or unix-style-paths false
+
+(see next section)
+
+Tag Conventions
+---------------
+
+As from version 2.00, fdb uses absolute Fluidinfo-style paths all the time
+(i.e. you always specify the namespace and don't use a leading slash).
+You can explicitly mandate this also by adding the line
+::
+
+    unix-style-paths false
+
+in your credentials file (see above).
+If you instead set 
+::
+
+    unix-style-paths true
+
+on the third line of the credentials file, fdb uses unix-style paths,
+meaning that paths are assumed to be relative to the user's namespace
+unless they are introduced with a leading slash.  Also, the about tag
+(fluiddb/about) may be referred to as /about.  This affects input and
+output.
+
+If you want to overrride this behaviour for a given command,
+you can use the ``-U`` flag to specify that the command will use
+unix-style paths, or ``-F`` to indicate that it will use fluidinfo-style
+paths.
+
+
+Tests
+-----
+
+The library includes a set of tests.   If you have valid credentials,
+and everything is OK, these should run successfully if you just execute
+the file fdb.py.   
+
+See :ref:`fdbtest`.
+
+
+Using the Library
+-----------------
+
+Four ways of exploring the library are:
+
+  1. look at the tests (the ones in the class TestFluidDB)
+
+  2. look at the blog (http://abouttag.blogspot.com)
+
+  3. read the function documentation in the source.
+
+  4. look at and run example.py, which should print DADGAD and 10.
+
+
+Documentation
+-------------
+
+This documentation is included with the release in the ``doc``
+subdirectory of with doc/build/html/index.html being the main
+web page.
+
+Delicious
+---------
+
+Also distributed with fdb itself is code for accessing delicious.com
+(http://del.icio.us/, as was), and for migrating bookmarks and other
+data to FluidDB.   This also includes functionality for creating web
+homepages from delicious based on a home tag.   See the README-DELICIOUS
+file for details on this functionality.
+
+
