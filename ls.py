@@ -173,6 +173,18 @@ class FluidinfoPerms:
         self.__dict__[u'read'].policy = u'closed'
         self.__dict__[u'read'].exceptions = fullgroup
 
+    def lock(self):
+        for name in WRITE_NAMES:
+            if hasattr(self, name):
+                self.__dict__[name].policy = u'closed'
+                self.__dict__[name].exceptions = []
+
+    def unlock(self):
+        for name in WRITE_NAMES:
+            if hasattr(self, name):
+                self.__dict__[name].policy = u'closed'
+                self.__dict__[name].exceptions = [self.owner]
+
     def update_fluidinfo(self, db):
 
         # check owner has control permissions
@@ -338,7 +350,7 @@ class ExtendedFluidDB(fdblib.FluidDB):
     def list_sorted_nshash(self, h, ns, long_=False, columns=True,
                            recurse=False, prnt=False, longer=False):
         if type(h) == types.IntType:
-            if h == STATUS.UNAUTHORIZED:
+            if h == fdblib.STATUS.UNAUTHORIZED:
                 return u'Permission denied.'
             else:
                 return u'Error status %s' % h
@@ -635,7 +647,7 @@ def execute_perms_command(objs, args, options):
         return
     spec = args[0]
     assert spec in (u'private', u'default', u'group', u'group-write',
-                    u'group-read')
+                    u'group-read', u'lock', u'unlock')
     isGroup = spec.startswith(u'group')
     if isGroup:
         group = args[1].split(u'+')
@@ -653,6 +665,14 @@ def execute_perms_command(objs, args, options):
                     inPerms.set_to_private()
                 elif spec == u'default':
                     inPerms.set_to_default()
+                elif spec == u'lock':
+                    inPerms = FluidinfoPerms(db, path, isTag=isTag,
+                                             getFromFI=True)
+                    inPerms.lock()
+                elif spec == u'unlock':
+                    inPerms = FluidinfoPerms(db, path, isTag=isTag,
+                                             getFromFI=True)
+                    inPerms.unlock()
                 else:  # group
                     inPerms = FluidinfoPerms(db, path, isTag=isTag,
                                              getFromFI=True)

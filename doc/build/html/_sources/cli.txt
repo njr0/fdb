@@ -844,13 +844,15 @@ Here ``permissions-spec`` can be
 
   * ``private``
   * ``default``
+  * ``lock``
+  * ``unlock``
   * ``group list+of+usernames+separated+by+pluses``
   * ``group-write list+of+usernames+separated+by+pluses``
   * ``group-read list+of+usernames+separated+by+pluses``
 
 **EXAMPLES**
 
-The six cases are as follows and apply equally namespaces and tags.
+The eight supported cases are as follows and apply equally namespaces and tags.
 In what follows, we'll use a ``rating`` tag and a namespace called ``friends``.
 
   * Make a tag or namespace completely private.
@@ -874,7 +876,7 @@ In what follows, we'll use a ``rating`` tag and a namespace called ``friends``.
         trwc------   njr/rating
         nrwc------   njr/fi/
 
-    (See `fdb ls` for an detailed explanation of the permissions codes.)
+    (See `fdb ls`_ for an detailed explanation of the permissions codes.)
 
     The full listing after this is:
     ::
@@ -921,6 +923,27 @@ In what follows, we'll use a ``rating`` tag and a namespace called ``friends``.
         $ fdb -F ls -ld njr/rating njr/fi
         trwcr--r--   njr/rating
         nrwcr--r--   njr/fi/
+
+  * Lock a namespace or tag so that it can't be edited (i.e.,
+    remove all write permissions).
+    ::
+
+      $ fdb perms lock njr/rating
+
+      $fdb ls -l njr/rating
+      tr-cr--r--   njr/rating
+
+    This does not alter read or control permissions.
+
+  * Unlock a namespace or tag so that the owner (only) can edit it.
+    ::
+
+      $ fdb perms unlock njr/rating
+
+      $fdb ls -l njr/rating
+      trwcr--r--   njr/rating
+
+    This does not alter read or control permissions.
 
   * Set the permissions on a tag or namespace so that one or more extra people
     can write it.   (This does not alter read permissions.)
@@ -980,13 +1003,16 @@ namespace called ``secret`` and set its permissions to
 then anyone will be able to read the password if they discover
 it exists.
 
+This is clearly not a good situation; the Fluidinfo team is aware of
+it and I expect some resolution will be forthcoming at some point.
+
 Note also that the *existence* of a tag cannot really be hidden
 in Fluidinfo, so people will be able to find out that you have
 a tag called ``secret/password``.
 
 
-
-fdb su ******
+fdb su
+******
 
 Set user: changes the set of credentials in use by ``fdb``.
 

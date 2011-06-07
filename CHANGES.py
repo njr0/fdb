@@ -248,7 +248,10 @@
 #                      and available online, hosted in Fluidinfo
 #                      itself/ at
 #                      http://fluiddb.fluidinfo.com/about/fdb/njr/index.html.
-# 2011/06/07 v2.05     Fixed some import problems caused by renaming
+#
+# 2011/06/07 v2.06     Fixed some import problems caused by renaming
 #                      fdb.py as fdb.
+#
+# 2011/06/07 v2.07     Added perms lock command (to remove all write perms)
 
 

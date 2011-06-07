@@ -5,13 +5,13 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>The fdb Command Line for Fluidinfo &mdash; fdb v2.06 documentation</title>
+    <title>The fdb Command Line for Fluidinfo &mdash; fdb v2.07 documentation</title>
     <link rel="stylesheet" href="_static/default.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '',
-        VERSION:     '2.06',
+        VERSION:     '2.07',
         COLLAPSE_MODINDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -19,7 +19,7 @@
     </script>
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="fdb v2.06 documentation" href="index.html" />
+    <link rel="top" title="fdb v2.07 documentation" href="index.html" />
     <link rel="next" title="Using Unix-Like Paths" href="unixlike.html" />
     <link rel="prev" title="Documentation for the fdb Command Line" href="index.html" /> 
   </head>
@@ -36,7 +36,7 @@
         <li class="right" >
           <a href="index.html" title="Documentation for the fdb Command Line"
              accesskey="P">previous</a> |</li>
-        <li><a href="index.html">fdb v2.06 documentation</a> &raquo;</li> 
+        <li><a href="index.html">fdb v2.07 documentation</a> &raquo;</li> 
       </ul>
     </div>  
 
@@ -778,13 +778,15 @@ situations.</p>
 <ul class="simple">
 <li><tt class="docutils literal"><span class="pre">private</span></tt></li>
 <li><tt class="docutils literal"><span class="pre">default</span></tt></li>
+<li><tt class="docutils literal"><span class="pre">lock</span></tt></li>
+<li><tt class="docutils literal"><span class="pre">unlock</span></tt></li>
 <li><tt class="docutils literal"><span class="pre">group</span> <span class="pre">list+of+usernames+separated+by+pluses</span></tt></li>
 <li><tt class="docutils literal"><span class="pre">group-write</span> <span class="pre">list+of+usernames+separated+by+pluses</span></tt></li>
 <li><tt class="docutils literal"><span class="pre">group-read</span> <span class="pre">list+of+usernames+separated+by+pluses</span></tt></li>
 </ul>
 </blockquote>
 <p><strong>EXAMPLES</strong></p>
-<p>The six cases are as follows and apply equally namespaces and tags.
+<p>The eight supported cases are as follows and apply equally namespaces and tags.
 In what follows, we&#8217;ll use a <tt class="docutils literal"><span class="pre">rating</span></tt> tag and a namespace called <tt class="docutils literal"><span class="pre">friends</span></tt>.</p>
 <blockquote>
 <ul>
@@ -803,7 +805,7 @@ The abbreviated view of this is shown by</p>
 trwc------   njr/rating
 nrwc------   njr/fi/</pre>
 </div>
-<p>(See <cite>fdb ls</cite> for an detailed explanation of the permissions codes.)</p>
+<p>(See <a class="reference internal" href="#fdb-ls">fdb ls</a> for an detailed explanation of the permissions codes.)</p>
 <p>The full listing after this is:</p>
 <div class="highlight-python"><pre>$ fdb -F ls -Ld njr/rating njr/fi
 
@@ -847,6 +849,23 @@ $ fdb -F ls -ld njr/rating njr/fi
 trwcr--r--   njr/rating
 nrwcr--r--   njr/fi/</pre>
 </div>
+</li>
+<li><p class="first">Lock a namespace or tag so that it can&#8217;t be edited (i.e.,
+remove all write permissions).</p>
+<div class="highlight-python"><pre>$ fdb perms lock njr/rating
+
+$fdb ls -l njr/rating
+tr-cr--r--   njr/rating</pre>
+</div>
+<p>This does not alter read or control permissions.</p>
+</li>
+<li><p class="first">Unlock a namespace or tag so that the owner (only) can edit it.</p>
+<div class="highlight-python"><pre>$ fdb perms unlock njr/rating
+
+$fdb ls -l njr/rating
+trwcr--r--   njr/rating</pre>
+</div>
+<p>This does not alter read or control permissions.</p>
 </li>
 <li><p class="first">Set the permissions on a tag or namespace so that one or more extra people
 can write it.   (This does not alter read permissions.)</p>
@@ -902,10 +921,14 @@ namespace called <tt class="docutils literal"><span class="pre">secret</span></t
 <tt class="docutils literal"><span class="pre">password</span></tt> with its permission set to the default <tt class="docutils literal"><span class="pre">trwcr--r--</span></tt>
 then anyone will be able to read the password if they discover
 it exists.</p>
+<p>This is clearly not a good situation; the Fluidinfo team is aware of
+it and I expect some resolution will be forthcoming at some point.</p>
 <p>Note also that the <em>existence</em> of a tag cannot really be hidden
 in Fluidinfo, so people will be able to find out that you have
 a tag called <tt class="docutils literal"><span class="pre">secret/password</span></tt>.</p>
-<p>fdb su <strong>**</strong></p>
+</div>
+<div class="section" id="fdb-su">
+<h3>fdb su<a class="headerlink" href="#fdb-su" title="Permalink to this headline">¶</a></h3>
 <p>Set user: changes the set of credentials in use by <tt class="docutils literal"><span class="pre">fdb</span></tt>.</p>
 <p><strong>FORM</strong></p>
 <div class="highlight-python"><pre>fdb su userspec</pre>
@@ -1010,6 +1033,7 @@ Ran 22 tests in 47.210s</pre>
 <li><a class="reference external" href="#fdb-count">fdb count</a></li>
 <li><a class="reference external" href="#fdb-ls">fdb ls</a></li>
 <li><a class="reference external" href="#fdb-perms">fdb perms</a></li>
+<li><a class="reference external" href="#fdb-su">fdb su</a></li>
 <li><a class="reference external" href="#fdb-whoami">fdb whoami</a></li>
 <li><a class="reference external" href="#fdb-pwd-fdb-pwn">fdb pwd / fdb pwn</a></li>
 <li><a class="reference external" href="#fdb-test">fdb test</a></li>
@@ -1061,7 +1085,7 @@ Ran 22 tests in 47.210s</pre>
         <li class="right" >
           <a href="index.html" title="Documentation for the fdb Command Line"
              >previous</a> |</li>
-        <li><a href="index.html">fdb v2.06 documentation</a> &raquo;</li> 
+        <li><a href="index.html">fdb v2.07 documentation</a> &raquo;</li> 
       </ul>
     </div>
     <div class="footer">
