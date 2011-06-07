@@ -558,21 +558,44 @@ as well as the standard flags like ``-s`` etc.
        $ fdb ls -l njr/rating
        trwcr--r--   rating
     
-     See the section on permissions for a full explanation of the permissions
-     string.   Briefly
+     Here:
     
       * the first ``t`` indicates that this is a tag rather
         than a namespace
     
       * the next three characters indicate that the owner (``njr``)
-        has read, write and control permission on the tag,
+        has ``read``, ``write`` and ``control`` permission on the tag,
     
-      * the next three characters indicate that any group exceptions have
-        read permission only on the tag
-    
-      * and the final three characters indicate that everyone (world)
+      * the *final* three characters indicate that everyone (world)
         has read permission but not write or control permission
         on the tag.
+
+      * the "middle" three characters (``r--``) show group
+        permissions.  Their meaning depends on the world permissions.
+        Because the world has read permission the only thing that an
+        exception list can do is to remove it; so in this case, the
+        ``r`` in the middle ``r--`` block indicates that no one is losing
+        read permission as a result of being on an exception list.  If
+        there were an exception list that excluded some people, then
+        the group read permission would be shown as ``-``.
+
+	If the world did not have read permission, an ``r`` would
+        mean that at least one person has read permission
+	in addition to the owner; and a ``-`` would indicate
+        that no one except the owner had read permission.
+
+      * the final thing to know about this way of describing permissions
+        is that Fluidinfo actually has more than one kind of write
+        permission for both tags and namespaces, and more than one
+	kind of control permission for tags.
+	Normally, all the write permissions are set consistently,
+	as are the two control permissions for tags.
+	If this is not the case, the permission will be shown as
+	a ``/``.
+
+      * Use the ``-g`` flag to find out who is in the group/exception list,
+        or ``-L`` for the even longer, full Fluidinfo description of
+	the permissions.
 
   #. Group long listing for tag (``njr/rating``), including permissions
      summary.
@@ -591,6 +614,8 @@ as well as the standard flags like ``-s`` etc.
      ::
 
         $ fdb perms group jkakar+ntoll njr/private-tag
+
+        $ fdb ls -g private-tag
         trwcrw----   ntoll+jkakar   njr/private-tag
 
      Group permission is now ``rw-``, and the group is ``ntoll+jkakar``.
@@ -598,10 +623,11 @@ as well as the standard flags like ``-s`` etc.
 
      Now let's set different groups for read and write.
      We'll let ``ntoll`` have write permission too.
-     To do this we update the write-group:
+     To do this we update the write group:
      ::
 
         $ fdb perms group-write ntoll private-tag
+
         $ fdb ls -g njr/private-tag
         trwcrw----   r:ntoll+jkakar  w:ntoll   njr/private-tag
 
@@ -644,7 +670,12 @@ as well as the standard flags like ``-s`` etc.
   #. Group long listing for namespace (``njr/private``), including permissions
      summary.
 
-     These are very similar to those for tags.   We'll just looks at
+     The ``-d`` tells ``ls`` that what you want is not the *content*
+     of the namespace, but the permissions on the namespace itself.
+     (``d`` stands for directory, which is essentially what a
+     namespace is.  You can use ``-n`` if you prefer.)
+
+     The result is very similar to that for tags.   We'll just look at
      a namespace ``fi``
      ::
 
@@ -665,13 +696,13 @@ as well as the standard flags like ``-s`` etc.
         $ fdb ls -ld njr/index
         nrwcr--r--   index
     
-      The first ``n`` indicates that ``njr/index`` is a namespace rather than
-      a tag.   This option may be specified using ``-n`` (for namespace)
-      or ``-d`` (for directory) since the latter will probably be more natural
-      for users familiar with unix-style ``ls``.
+     The first ``n`` indicates that ``njr/index`` is a namespace rather than
+     a tag.   This option may be specified using ``-n`` (for namespace)
+     or ``-d`` (for directory) since the latter will probably be more natural
+     for users familiar with unix-style ``ls``.
     
-      See the section on permissions for an explanation of the permissions
-      string.
+     See the section on permissions for an explanation of the permissions
+     string.
 
   #. Longer listing for a namespace itself (``njr/index``) (as opposed to
      its contents):
@@ -955,8 +986,7 @@ a tag called ``secret/password``.
 
 
 
-fdb su
-******
+fdb su ******
 
 Set user: changes the set of credentials in use by ``fdb``.
 

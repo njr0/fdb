@@ -428,7 +428,9 @@ def parse_args(args=None):
     general.add_option(u'-d', u'--namespace', action=u'store_true',
                        default=False,
             help=u'don\'t list namespace; just name of namespace.')
-
+    general.add_option(u'-n', u'--ns', action=u'store_true',
+                       default=False,
+            help=u'don\'t list namespace; just name of namespace.')
     parser.add_option_group(general)
 
     other = OptionGroup(parser, u'Other flags')

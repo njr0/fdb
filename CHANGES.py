@@ -248,4 +248,7 @@
 #                      and available online, hosted in Fluidinfo
 #                      itself/ at
 #                      http://fluiddb.fluidinfo.com/about/fdb/njr/index.html.
+# 2011/06/07 v2.05     Fixed some import problems caused by renaming
+#                      fdb.py as fdb.
+
 

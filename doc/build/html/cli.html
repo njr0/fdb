@@ -5,13 +5,13 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>The fdb Command Line for Fluidinfo &mdash; fdb v2.05 documentation</title>
+    <title>The fdb Command Line for Fluidinfo &mdash; fdb v2.06 documentation</title>
     <link rel="stylesheet" href="_static/default.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '',
-        VERSION:     '2.05',
+        VERSION:     '2.06',
         COLLAPSE_MODINDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -19,7 +19,7 @@
     </script>
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="fdb v2.05 documentation" href="index.html" />
+    <link rel="top" title="fdb v2.06 documentation" href="index.html" />
     <link rel="next" title="Using Unix-Like Paths" href="unixlike.html" />
     <link rel="prev" title="Documentation for the fdb Command Line" href="index.html" /> 
   </head>
@@ -36,7 +36,7 @@
         <li class="right" >
           <a href="index.html" title="Documentation for the fdb Command Line"
              accesskey="P">previous</a> |</li>
-        <li><a href="index.html">fdb v2.05 documentation</a> &raquo;</li> 
+        <li><a href="index.html">fdb v2.06 documentation</a> &raquo;</li> 
       </ul>
     </div>  
 
@@ -248,10 +248,9 @@ what tags to set.   Tag value pairs usually take the form:</p>
 </pre></div>
 </div>
 <p>so that a list of them might be</p>
-<div class="highlight-python"><pre>rating=9 description="fabulous" seen=true price = 18.77</pre>
+<div class="highlight-python"><pre>rating=9 description="fabulous" seen=true price=18.77</pre>
 </div>
-<p>(fdb is not too fussy about whether you put spaces around equals signs
-or not.)</p>
+<p>Don&#8217;t put spaces around equals signs assigning tag values: it won&#8217;t work.</p>
 <p>In general, strings should be in double quotes <tt class="docutils literal"><span class="pre">&quot;like</span> <span class="pre">this&quot;</span></tt>,
 booleans should be <tt class="docutils literal"><span class="pre">true</span></tt>,
 <tt class="docutils literal"><span class="pre">false</span></tt>, <tt class="docutils literal"><span class="pre">t</span></tt> or <tt class="docutils literal"><span class="pre">f</span></tt> (unquoted) and numbers should just be plain numbers
@@ -270,7 +269,7 @@ specified.</p>
 </div>
 <p><strong>EXAMPLES</strong></p>
 <div class="highlight-python"><pre>fdb tag -a "Eiffel Tower" njr/rating=7 njr/seen
-fdb tag -a "Eiffel Tower" njr/rating = 7 njr/seen
+fdb tag -a "Eiffel Tower" njr/rating=7 njr/seen
 fdb tag -i 93bd1999-0998-49cc-8004-af457ce34ce4 njr/rating=7 njr/seen
 fdb tag -q 'fluiddb/about matches "Eiffel Tower"' njr/rating=7 njr/seen
 fdb tag -U -a "Eiffel Tower" rating=7 seen</pre>
@@ -520,19 +519,45 @@ miro/planets/NoMass not found</pre>
 <div class="highlight-python"><pre>$ fdb ls -l njr/rating
 trwcr--r--   rating</pre>
 </div>
-<p>See the section on permissions for a full explanation of the permissions
-string.   Briefly</p>
+<p>Here:</p>
 <blockquote>
-<ul class="simple">
-<li>the first <tt class="docutils literal"><span class="pre">t</span></tt> indicates that this is a tag rather
-than a namespace</li>
-<li>the next three characters indicate that the owner (<tt class="docutils literal"><span class="pre">njr</span></tt>)
-has read, write and control permission on the tag,</li>
-<li>the next three characters indicate that any group exceptions have
-read permission only on the tag</li>
-<li>and the final three characters indicate that everyone (world)
+<ul>
+<li><p class="first">the first <tt class="docutils literal"><span class="pre">t</span></tt> indicates that this is a tag rather
+than a namespace</p>
+</li>
+<li><p class="first">the next three characters indicate that the owner (<tt class="docutils literal"><span class="pre">njr</span></tt>)
+has <tt class="docutils literal"><span class="pre">read</span></tt>, <tt class="docutils literal"><span class="pre">write</span></tt> and <tt class="docutils literal"><span class="pre">control</span></tt> permission on the tag,</p>
+</li>
+<li><p class="first">the <em>final</em> three characters indicate that everyone (world)
 has read permission but not write or control permission
-on the tag.</li>
+on the tag.</p>
+</li>
+<li><p class="first">the &#8220;middle&#8221; three characters (<tt class="docutils literal"><span class="pre">r--</span></tt>) show group
+permissions.  Their meaning depends on the world permissions.
+Because the world has read permission the only thing that an
+exception list can do is to remove it; so in this case, the
+<tt class="docutils literal"><span class="pre">r</span></tt> in the middle <tt class="docutils literal"><span class="pre">r--</span></tt> block indicates that no one is losing
+read permission as a result of being on an exception list.  If
+there were an exception list that excluded some people, then
+the group read permission would be shown as <tt class="docutils literal"><span class="pre">-</span></tt>.</p>
+<p>If the world did not have read permission, an <tt class="docutils literal"><span class="pre">r</span></tt> would
+mean that at least one person has read permission
+in addition to the owner; and a <tt class="docutils literal"><span class="pre">-</span></tt> would indicate
+that no one except the owner had read permission.</p>
+</li>
+<li><p class="first">the final thing to know about this way of describing permissions
+is that Fluidinfo actually has more than one kind of write
+permission for both tags and namespaces, and more than one
+kind of control permission for tags.
+Normally, all the write permissions are set consistently,
+as are the two control permissions for tags.
+If this is not the case, the permission will be shown as
+a <tt class="docutils literal"><span class="pre">/</span></tt>.</p>
+</li>
+<li><p class="first">Use the <tt class="docutils literal"><span class="pre">-g</span></tt> flag to find out who is in the group/exception list,
+or <tt class="docutils literal"><span class="pre">-L</span></tt> for the even longer, full Fluidinfo description of
+the permissions.</p>
+</li>
 </ul>
 </blockquote>
 </li>
@@ -547,14 +572,17 @@ there is no group; or to say it another way, group permissions
 can be considered to be the same as world permissions.</p>
 <p>Now let&#8217;s grant read and write access to <tt class="docutils literal"><span class="pre">jkakar</span></tt> and <tt class="docutils literal"><span class="pre">ntoll</span></tt></p>
 <div class="highlight-python"><pre>$ fdb perms group jkakar+ntoll njr/private-tag
+
+$ fdb ls -g private-tag
 trwcrw----   ntoll+jkakar   njr/private-tag</pre>
 </div>
 <p>Group permission is now <tt class="docutils literal"><span class="pre">rw-</span></tt>, and the group is <tt class="docutils literal"><span class="pre">ntoll+jkakar</span></tt>.
 (The exception list also includes <tt class="docutils literal"><span class="pre">njr</span></tt>, of course.)</p>
 <p>Now let&#8217;s set different groups for read and write.
 We&#8217;ll let <tt class="docutils literal"><span class="pre">ntoll</span></tt> have write permission too.
-To do this we update the write-group:</p>
+To do this we update the write group:</p>
 <div class="highlight-python"><pre>$ fdb perms group-write ntoll private-tag
+
 $ fdb ls -g njr/private-tag
 trwcrw----   r:ntoll+jkakar  w:ntoll   njr/private-tag</pre>
 </div>
@@ -593,7 +621,11 @@ trwcr--r--   class</pre>
 </li>
 <li><p class="first">Group long listing for namespace (<tt class="docutils literal"><span class="pre">njr/private</span></tt>), including permissions
 summary.</p>
-<p>These are very similar to those for tags.   We&#8217;ll just looks at
+<p>The <tt class="docutils literal"><span class="pre">-d</span></tt> tells <tt class="docutils literal"><span class="pre">ls</span></tt> that what you want is not the <em>content</em>
+of the namespace, but the permissions on the namespace itself.
+(<tt class="docutils literal"><span class="pre">d</span></tt> stands for directory, which is essentially what a
+namespace is.  You can use <tt class="docutils literal"><span class="pre">-n</span></tt> if you prefer.)</p>
+<p>The result is very similar to that for tags.   We&#8217;ll just look at
 a namespace <tt class="docutils literal"><span class="pre">fi</span></tt></p>
 <div class="highlight-python"><pre>$ fdb ls -gd njr/fi
 nrwcrw-r--   r:(world)  w:terrycojones+paparent   njr/fi/</pre>
@@ -604,20 +636,18 @@ and <tt class="docutils literal"><span class="pre">paparent</span></tt> have wri
 </li>
 <li><p class="first">Long listing for a namespace itself (<tt class="docutils literal"><span class="pre">njr/index</span></tt>) (as opposed to
 its contents),  including Fluidinfo-style permissions summary:</p>
-<div class="highlight-python"><pre>  $ fdb ls -ln njr/index
-  nrwcr--r--   index
+<div class="highlight-python"><pre>$ fdb ls -ln njr/index
+nrwcr--r--   index
 
-  $ fdb ls -ld njr/index
-  nrwcr--r--   index
-
-The first ``n`` indicates that ``njr/index`` is a namespace rather than
-a tag.   This option may be specified using ``-n`` (for namespace)
-or ``-d`` (for directory) since the latter will probably be more natural
-for users familiar with unix-style ``ls``.
-
-See the section on permissions for an explanation of the permissions
-string.</pre>
+$ fdb ls -ld njr/index
+nrwcr--r--   index</pre>
 </div>
+<p>The first <tt class="docutils literal"><span class="pre">n</span></tt> indicates that <tt class="docutils literal"><span class="pre">njr/index</span></tt> is a namespace rather than
+a tag.   This option may be specified using <tt class="docutils literal"><span class="pre">-n</span></tt> (for namespace)
+or <tt class="docutils literal"><span class="pre">-d</span></tt> (for directory) since the latter will probably be more natural
+for users familiar with unix-style <tt class="docutils literal"><span class="pre">ls</span></tt>.</p>
+<p>See the section on permissions for an explanation of the permissions
+string.</p>
 </li>
 <li><p class="first">Longer listing for a namespace itself (<tt class="docutils literal"><span class="pre">njr/index</span></tt>) (as opposed to
 its contents):</p>
@@ -875,9 +905,7 @@ it exists.</p>
 <p>Note also that the <em>existence</em> of a tag cannot really be hidden
 in Fluidinfo, so people will be able to find out that you have
 a tag called <tt class="docutils literal"><span class="pre">secret/password</span></tt>.</p>
-</div>
-<div class="section" id="fdb-su">
-<h3>fdb su<a class="headerlink" href="#fdb-su" title="Permalink to this headline">¶</a></h3>
+<p>fdb su <strong>**</strong></p>
 <p>Set user: changes the set of credentials in use by <tt class="docutils literal"><span class="pre">fdb</span></tt>.</p>
 <p><strong>FORM</strong></p>
 <div class="highlight-python"><pre>fdb su userspec</pre>
@@ -982,7 +1010,6 @@ Ran 22 tests in 47.210s</pre>
 <li><a class="reference external" href="#fdb-count">fdb count</a></li>
 <li><a class="reference external" href="#fdb-ls">fdb ls</a></li>
 <li><a class="reference external" href="#fdb-perms">fdb perms</a></li>
-<li><a class="reference external" href="#fdb-su">fdb su</a></li>
 <li><a class="reference external" href="#fdb-whoami">fdb whoami</a></li>
 <li><a class="reference external" href="#fdb-pwd-fdb-pwn">fdb pwd / fdb pwn</a></li>
 <li><a class="reference external" href="#fdb-test">fdb test</a></li>
@@ -1034,7 +1061,7 @@ Ran 22 tests in 47.210s</pre>
         <li class="right" >
           <a href="index.html" title="Documentation for the fdb Command Line"
              >previous</a> |</li>
-        <li><a href="index.html">fdb v2.05 documentation</a> &raquo;</li> 
+        <li><a href="index.html">fdb v2.06 documentation</a> &raquo;</li> 
       </ul>
     </div>
     <div class="footer">

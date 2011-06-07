@@ -1,8 +1,6 @@
 import math
 import sys
 import types
-from fdb import STATUS
-import fdb
 import fdblib
 import cli
 
@@ -270,11 +268,11 @@ def to_string_grid(items, pageWidth=78, maxCols=9):
                                    for row in range(nRows)])
 
 
-class ExtendedFluidDB(fdb.FluidDB):
+class ExtendedFluidDB(fdblib.FluidDB):
     def __init__(self, credentials=None, host=None, debug=False,
                  encoding=fdblib.DEFAULT_ENCODING, unixStylePaths=None):
-        fdb.FluidDB.__init__(self, credentials, host, debug,
-                             encoding, unixStylePaths)
+        fdblib.FluidDB.__init__(self, credentials, host, debug,
+                                encoding, unixStylePaths)
 
     def list_namespace(self, ns, returnDescription=True,
                         returnNamespaces=True, returnTags=True):
@@ -282,12 +280,12 @@ class ExtendedFluidDB(fdb.FluidDB):
                                     returnDescription=returnDescription,
                                     returnNamespaces=returnNamespaces,
                                     returnTags=returnTags)
-        return content if status == STATUS.OK else status
+        return content if status == fdblib.STATUS.OK else status
 
     def list_r_namespace(self, rootns):
         L = self.list_namespace(rootns, returnDescription=False)
-        if L == fdb.STATUS.NOT_FOUND:
-            return fdb.STATUS.NOT_FOUND
+        if L == fdblib.STATUS.NOT_FOUND:
+            return fdblib.STATUS.NOT_FOUND
         if type(L) == int:
             return {u'namespaceNames': [], u'tagNames': [], u'failures': True}
         failures = False
@@ -312,7 +310,7 @@ class ExtendedFluidDB(fdb.FluidDB):
 
     def rm_r(self, rootns):
         L = self.list_r_namespace(rootns)
-        if L == fdb.STATUS.NOT_FOUND:
+        if L == fdblib.STATUS.NOT_FOUND:
             return L
         elif L[u'failures']:
             return 1            # non-zero failure code
@@ -326,7 +324,7 @@ class ExtendedFluidDB(fdb.FluidDB):
             failed = False
             for (n, i) in z:
                 r = self.delete_abstract_tag(u'/%s' % i)
-                failed = failed or (r != fdb.STATUS.NO_CONTENT)
+                failed = failed or (r != fdblib.STATUS.NO_CONTENT)
         if failed:
             return 1
         return self.delete_namespace(u'/' + rootns)
@@ -389,7 +387,7 @@ class ExtendedFluidDB(fdb.FluidDB):
         status, content = self.call(u'GET', path, None, action=action)
         return (FluidinfoPerm(owner, hash=content, name=name, action=action,
                               isTag=isTag)
-                if status == STATUS.OK else status)
+                if status == fdblib.STATUS.OK else status)
 
     def get_tag_perms_hash(self, tag):
         h = {}
@@ -543,7 +541,7 @@ class ExtendedFluidDB(fdb.FluidDB):
         if self.debug:
             print path, body, action
         status, content = self.call(u'PUT', path, body, action=action)
-        return 0 if status == STATUS.NO_CONTENT else status
+        return 0 if status == fdblib.STATUS.NO_CONTENT else status
 
 
 def write_status(writes):
@@ -563,7 +561,7 @@ def execute_ls_command(objs, tags, options):
         tags = [(u'/' if db.unixStyle else u'') + db.credentials.username]
     for tag in tags:
         fulltag = db.abs_tag_path(tag, inPref=True)
-        if options.namespace:
+        if options.namespace or options.ns:
             if db.ns_exists(fulltag):
                 if long_ or options.longer:
                     nsResult = db.full_perms(fulltag[1:] + u'/',
