@@ -454,7 +454,7 @@ def parse_args(args=None):
 
 
 def execute_command_line(action, args, options, parser):
-    if not action == u'ls':
+    if not action == 'ls':
         credentials = Credentials(options.user[0]) if options.user else None
         db = FluidDB(host=options.hostname, credentials=credentials,
                      debug=options.debug, unixStylePaths=path_style(options))
@@ -462,48 +462,48 @@ def execute_command_line(action, args, options, parser):
         options.query))
     ids = chain(options.id, ids_from_queries)
 
-    objs = [O({u'mode': u'about', u'specifier': a}) for a in options.about] + \
-            [O({u'mode': u'id', u'specifier': id}) for id in ids]
+    objs = [O({'mode': 'about', 'specifier': a}) for a in options.about] + \
+            [O({'mode': 'id', 'specifier': id}) for id in ids]
 
     if options.version:
-        print u'fdb %s' % version()
-        if action == u'version':
+        print 'fdb %s' % version()
+        if action == 'version':
             sys.exit(0)
-    if action == u'help':
+    if action == 'help':
         print USAGE if db.unixStyle else USAGE_FI
         sys.exit(0)
     elif (action.upper() not in HTTP_METHODS + ARGLESS_COMMANDS
           and not args):
-        parser.error(u'Too few arguments for action %s' % action)
-    elif action == u'count':
-        print u'Total: %s' % (flags.Plural(len(objs), u'object'))
-    elif action == u'tags':
+        parser.error('Too few arguments for action %s' % action)
+    elif action == 'count':
+        print 'Total: %s' % (flags.Plural(len(objs), 'object'))
+    elif action == 'tags':
         execute_tags_command(objs, db, options)
-    elif action in (u'tag', u'untag', u'show'):
+    elif action in ('tag', 'untag', 'show'):
         if not (options.about or options.query or options.id):
-            parser.error(u'You must use -q, -a or -i with %s' % action)
+            parser.error('You must use -q, -a or -i with %s' % action)
         tags = args
-        if len(tags) == 0 and action != u'count':
+        if len(tags) == 0 and action != 'count':
             nothing_to_do()
         actions = {
-            u'tag': execute_tag_command,
-            u'untag': execute_untag_command,
-            u'show': execute_show_command,
+            'tag': execute_tag_command,
+            'untag': execute_untag_command,
+            'show': execute_show_command,
         }
         command = actions[action]
 
         command(objs, db, args, options)
-    elif action == u'ls':
+    elif action == 'ls':
         ls.execute_ls_command(objs, args, options)
-    elif action == u'chmod':
+    elif action == 'chmod':
         ls.execute_chmod_command(objs, args, options)
-    elif action == u'perms':
+    elif action == 'perms':
         ls.execute_perms_command(objs, args, options)
-    elif action in (u'pwd', u'pwn', u'whoami'):
+    elif action in ('pwd', 'pwn', 'whoami'):
         execute_whoami_command(db)
-    elif action == u'su':
+    elif action == 's':
         execute_su_command(db, args)
-    elif action in ['get', u'put', u'post', u'delete']:
+    elif action in ['get', 'put', 'post', 'delete']:
         execute_http_request(action, args, db, options)
     else:
-        parser.error(u'Unrecognized command %s' % action)
+        parser.error('Unrecognized command %s' % action)

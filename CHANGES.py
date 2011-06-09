@@ -253,5 +253,9 @@
 #                      fdb.py as fdb.
 #
 # 2011/06/07 v2.07     Added perms lock command (to remove all write perms)
+#
+# 2011/06/09 v2.08     Changed all the optparse stuff back not to use
+#                      unicode as a lot of versions of optparse don't
+#                      seem to work with unicode.
 
 
