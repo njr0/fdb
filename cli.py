@@ -385,68 +385,68 @@ def parse_args(args=None):
     if args is None:
         args = [a.decode(DEFAULT_ENCODING) for a in sys.argv[1:]]
     if Credentials().unixStyle:
-        usage = USAGE_FI if u'-F' in args else USAGE
+        usage = USAGE_FI if '-F' in args else USAGE
     else:
-        usage = USAGE if u'-U' in args else USAGE_FI
+        usage = USAGE if '-U' in args else USAGE_FI
     parser = OptionParser(usage=usage)
-    general = OptionGroup(parser, u'General options')
-    general.add_option(u'-a', u'--about', action=u'append', default=[],
-            help=u'used to specify objects by about tag')
-    general.add_option(u'-i', u'--id', action=u'append', default=[],
-            help=u'used to specify objects by ID')
-    general.add_option(u'-q', u'--query', action=u'append', default=[],
-            help=u'used to specify objects with a FluidDB query')
-    general.add_option(u'-v', u'--verbose', action=u'store_true', default=False,
-            help=u'encourages FDB to report what it\'s doing (verbose mode)')
-    general.add_option(u'-D', u'--debug', action=u'store_true', default=False,
-            help=u'enables debug mode (more output)')
-    general.add_option(u'-T', u'--timeout', type=u'float', default=HTTP_TIMEOUT,
-            metavar=u'n', help=u'sets the HTTP timeout to n seconds')
-    general.add_option(u'-U', u'--unixstylepaths', action=u'store_true',
+    general = OptionGroup(parser, 'General options')
+    general.add_option('-a', '--about', action='append', default=[],
+            help='used to specify objects by about tag')
+    general.add_option('-i', '--id', action='append', default=[],
+            help='used to specify objects by ID')
+    general.add_option('-q', '--query', action='append', default=[],
+            help='used to specify objects with a FluidDB query')
+    general.add_option('-v', '--verbose', action='store_true', default=False,
+            help='encourages FDB to report what it\'s doing (verbose mode)')
+    general.add_option('-D', '--debug', action='store_true', default=False,
+            help='enables debug mode (more output)')
+    general.add_option('-T', '--timeout', type='float', default=HTTP_TIMEOUT,
+            metavar='n', help='sets the HTTP timeout to n seconds')
+    general.add_option('-U', '--unixstylepaths', action='store_true',
                        default=False,
-            help=u'Forces unix-style paths for tags and namespaces.')
-    general.add_option(u'-u', u'--user', action=u'append', default=[],
-            help=u'used to specify a different user (credentials file)')
-    general.add_option(u'-F', u'--fluidinfostylepaths', action=u'store_true',
+            help='Forces unix-style paths for tags and namespaces.')
+    general.add_option('-u', '--user', action='append', default=[],
+            help='used to specify a different user (credentials file)')
+    general.add_option('-F', '--fluidinfostylepaths', action='store_true',
                        default=False,
-            help=u'Forces Fluidinfo--style paths for tags and namespaces.')
-    general.add_option(u'-V', u'--version', action=u'store_true',
+            help='Forces Fluidinfo--style paths for tags and namespaces.')
+    general.add_option('-V', '--version', action='store_true',
                        default=False,
-            help=u'Report version number.')
-    general.add_option(u'-R', u'--recurse', action=u'store_true',
+            help='Report version number.')
+    general.add_option('-R', '--recurse', action='store_true',
                        default=False,
-            help=u'recursive (for ls and rm).')
-    general.add_option(u'-l', u'--long', action=u'store_true',
+            help='recursive (for ls and rm).')
+    general.add_option('-l', '--long', action='store_true',
                        default=False,
-            help=u'long listing (for ls).')
-    general.add_option(u'-L', u'--longer', action=u'store_true',
+            help='long listing (for ls).')
+    general.add_option('-L', '--longer', action='store_true',
                        default=False,
-            help=u'longer listing (for ls).')
-    general.add_option(u'-g', u'--group', action=u'store_true',
+            help='longer listing (for ls).')
+    general.add_option('-g', '--group', action='store_true',
                        default=False,
-            help=u'long listing with groups (for ls).')
-    general.add_option(u'-d', u'--namespace', action=u'store_true',
+            help='long listing with groups (for ls).')
+    general.add_option('-d', '--namespace', action='store_true',
                        default=False,
-            help=u'don\'t list namespace; just name of namespace.')
-    general.add_option(u'-n', u'--ns', action=u'store_true',
+            help='don\'t list namespace; just name of namespace.')
+    general.add_option('-n', '--ns', action='store_true',
                        default=False,
-            help=u'don\'t list namespace; just name of namespace.')
+            help='don\'t list namespace; just name of namespace.')
     parser.add_option_group(general)
 
-    other = OptionGroup(parser, u'Other flags')
-    other.add_option(u'-s', u'--sandbox', action=u'store_const',
-                     dest=u'hostname', const=SANDBOX_PATH,
-            help=u'use the sandbox at http://sandbox.fluidinfo.com')
-    other.add_option(u'--hostname', default=FLUIDDB_PATH, dest=u'hostname',
-            help=(u'use the specified host (which should start http:// or '
-                   u'https://; http:// will be added if it doesn\'t) default '
-                   u'is %default'))
+    other = OptionGroup(parser, 'Other flags')
+    other.add_option('-s', '--sandbox', action='store_const',
+                     dest='hostname', const=SANDBOX_PATH,
+            help='use the sandbox at http://sandbox.fluidinfo.com')
+    other.add_option('--hostname', default=FLUIDDB_PATH, dest='hostname',
+            help=('use the specified host (which should start http:// or '
+                   'https://; http:// will be added if it doesn\'t) default '
+                   'is %default'))
     parser.add_option_group(other)
 
     options, args = parser.parse_args(args)
 
     if args == []:
-        action = u'version' if options.version else u'help'
+        action = 'version' if options.version else 'help'
     else:
         action, args = args[0], args[1:]
 
