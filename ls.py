@@ -100,11 +100,12 @@ class UnixPerms:
 
 class FluidinfoPerm:
     def __init__(self, owner, policy=None, exceptions=None, hash=None,
-                 name=None, action=None, isTag=None):
+                 name=None, action=None, isTag=None, isPolicy=False):
         self.owner = owner
         self.name = name
         self.action = action
         self.isTag = isTag
+        self.isPolicy = isPolicy
         if hash:
             self.policy=hash[u'policy']
             self.exceptions=hash[u'exceptions']
@@ -125,8 +126,9 @@ class FluidinfoPerm:
 
 
 class FluidinfoPerms:
-    def __init__(self, db, path, isTag, getFromFI=True):
+    def __init__(self, db, path, isTag, getFromFI=True, isPolicy=False):
         self.isTag = isTag
+        self.isPolicy = isPolicy
         self.path = path
         self.entities = [u'abstract-tag', u'tag'] if isTag else [u'namespace']
 
@@ -135,15 +137,21 @@ class FluidinfoPerms:
             desc = RAW_PERMS[entity]
             for (action, name) in zip(desc.actions, desc.names):
                 if getFromFI:
-                    self.__dict__[name] = db.get_raw_perm(entity, path[1:],
-                                                          action, isTag)
+                    if isPolicy:
+                        self.__dict__[name] = db.get_raw_policy(entity,
+                                                                path[1:],
+                                                                action)
+                    else:
+                        self.__dict__[name] = db.get_raw_perm(entity, path[1:],
+                                                              action, isTag)
                 else:
                     # figure out defaults etc.
                     policy = u'open' if name in READ_NAMES else u'closed'
                     exceptions = [] if name in READ_NAMES else [self.owner]
                     self.__dict__[name] = FluidinfoPerm(self.owner, policy,
                                                         exceptions, None,
-                                                        name, action, isTag)
+                                                        name, action, isTag,
+                                                        isPolicy)
 
     def set_to_private(self):
         for name in ALL_NAMES:
@@ -401,6 +409,16 @@ class ExtendedFluidDB(fdblib.FluidDB):
                               isTag=isTag)
                 if status == fdblib.STATUS.OK else status)
 
+    def get_raw_policy(self, entity, owner, action):
+        assert entity in RAW_PERM_ENTITIES
+        perm = RAW_PERMS[entity]
+        assert action in perm.actions
+        path = u'/policies/%s/%s/%s' % (owner, perm.path, action)
+        status, content = self.call(u'GET', path, None, action=action)
+        return (FluidinfoPerm(owner, hash=content, name=owner, action=action,
+                              isPolicy=True)
+                if status == fdblib.STATUS.OK else status)
+
     def get_tag_perms_hash(self, tag):
         h = {}
         for entity in [u'abstract-tag', u'tag']:
@@ -518,8 +536,6 @@ class ExtendedFluidDB(fdblib.FluidDB):
             gs = u'r:%s  w:%s' % (gr, gw)
         return gs
 
-
-
     def perms_string(self, tagOrNS, longer=False, group=False):
         tagOrNS = tagOrNS.strip()
         if tagOrNS.endswith(u'/'):
@@ -569,6 +585,15 @@ def execute_ls_command(objs, tags, options):
                          debug=options.debug,
                          unixStylePaths=fdblib.path_style(options))
     long_ = options.long or options.group
+    if options.policy:
+        if len(tags) > 0:
+            print u'Form: ls -P'
+        else:
+            print unicode(FluidinfoPerms(db, u'/' + db.credentials.username,
+                                   isTag=False, isPolicy=True))
+            print unicode(FluidinfoPerms(db, u'/' + db.credentials.username,
+                                   isTag=True, isPolicy=True))
+        return
     if len(tags) == 0:
         tags = [(u'/' if db.unixStyle else u'') + db.credentials.username]
     for tag in tags:
