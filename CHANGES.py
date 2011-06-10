@@ -262,6 +262,11 @@
 #                      (also known as /policies).
 #
 # 2011/06/09 v2.10     Fixed su command, which got broken by the optparse fix.
+#
+# 2011/06/09 v2.11     Changed fdb back to fdb.py and created new fdb
+#                      that imports it so that it can run.
+#
+
 
 
 
