@@ -47,6 +47,26 @@ class TestFluidDB(unittest.TestCase):
         self.assertEqual(o.URI, tag_uri(db.credentials.username,
                                                 'testrating'))
 
+    def testTags(self):
+        db = self.db
+        user = db.credentials.username
+        o = db.tag_object_by_about(u'αβγδε', u'ζηθικ', u'φχψω')
+        o = db.tag_object_by_about(u'αβγδε', u'λμνξο', u'πρστυ')
+
+        # check tags function OK
+        tags = db.get_object_tags_by_about(u'αβγδε')
+        self.assertEqual(u'%s/ζηθικ' % user in tags, True)
+        self.assertEqual(u'%s/λμνξο' % user in tags, True)
+
+        # check tag values are OK
+        status, v = db.get_tag_value_by_about(u'αβγδε', u'ζηθικ')
+        self.assertEqual(v, u'φχψω')
+
+        # clean up
+        o = db.untag_object_by_about(u'αβγδε', u'ζηθικ')
+        o = db.untag_object_by_about(u'αβγδε', u'λμνξο')
+
+
     def testSetTagByID(self):
         db = self.db
         user = db.credentials.username
@@ -382,5 +402,5 @@ class TestCLI(unittest.TestCase):
         self.showUntagSuccessTest('id')
 
 if __name__ == '__main__':
-    unittest.main(verbosity=2)
+    unittest.main()
 

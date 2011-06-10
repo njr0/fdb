@@ -266,6 +266,13 @@
 # 2011/06/09 v2.11     Changed fdb back to fdb.py and created new fdb
 #                      that imports it so that it can run.
 #
+# 2011/06/09 v2.12     Changed to use /about wherever possible.
+#                      Added test for get_object_tags; this
+#                      also uses non-ASCII, non-latin-1 tag names
+#                      and values as a test of unicode handling.
+#
+
+
 
 
 

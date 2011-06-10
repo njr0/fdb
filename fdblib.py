@@ -6,7 +6,7 @@
 #               in the AUTHOR
 # Licence terms in LICENCE.
 
-__version__ = u'2.11'
+__version__ = u'2.12'
 VERSION = __version__
 
 import codecs
@@ -540,70 +540,91 @@ class FluidDB:
         (status, o) = self.call('DELETE', fullTag)
         return 0 if status == STATUS.NO_CONTENT else status
 
-    def tag_object_by_id(self, id, tag, value=None, value_type=None,
-                         createAbstractTagIfNeeded=True,
-                         inPref=False):
+    def tag_object(self, spec, tag, byAbout, value=None, value_type=None,
+                   createAbstractTagIfNeeded=True, inPref=False):
+                         
         """Tags the object with the given id with the tag
            given, and the value given, if present.
            If the (abstract) tag with corresponding to the
            tag given doesn't exist, it is created unless
            createAbstractTagIfNeeded is set to False.
         """
+        path = u'about' if byAbout else u'objects'
         fullTag = self.abs_tag_path(tag, inPref=inPref)
-        objTag = u'/objects/%s%s' % (id, fullTag)
-
+        objTag = u'/%s/%s%s' % (path, spec, fullTag)
         (status, o) = self._set_tag_value(objTag, value, value_type)
         if status == STATUS.NOT_FOUND and createAbstractTagIfNeeded:
             o = self.create_abstract_tag(tag)
             if type(o) == types.IntType:       # error code
                 return o
             else:
-                return self.tag_object_by_id(id, tag, value, value_type, False)
+                return self.tag_object(spec, tag, byAbout, value, value_type,
+                                       False)
         else:
             return 0 if status == STATUS.NO_CONTENT else status
 
-    tag_object_by_about = by_about(tag_object_by_id)
+    def tag_object_by_id(self, id, tag, value=None, value_type=None,
+                         createAbstractTagIfNeeded=True, inPref=False):
+        return self.tag_object(id, tag, False, value, value_type,
+                               createAbstractTagIfNeeded, inPref)
 
-    def untag_object_by_id(self, id, tag, missingConstitutesSuccess=True,
-                           inPref=False):
-        """Removes the tag from the object with id if present.
+    def tag_object_by_about(self, about, tag, value=None, value_type=None,
+                            createAbstractTagIfNeeded=True, inPref=False):
+        return self.tag_object(about, tag, True, value, value_type,
+                               createAbstractTagIfNeeded, inPref)
+
+    def untag_object(self, spec, tag, byAbout, missingConstitutesSuccess=True,
+                     inPref=False):
+        """Removes the tag from the object f present.
            If the tag, or the object, doesn't exist,
            the default is that this is considered successful,
            but missingConstitutesSuccess can be set to False
            to override this behaviour.
 
+           spec is the id or about tag for the object, and with
+           with byAbout being true if it is an about tag.
+
            Returns 0 for success, non-zero error code otherwise.
         """
+        path = u'about' if byAbout else u'objects'
         fullTag = self.abs_tag_path(tag, inPref=inPref)
-        objTag = u'/objects/%s%s' % (id, fullTag)
+        objTag = u'/%s/%s%s' % (path, spec, fullTag)
         (status, o) = self.call('DELETE', objTag)
         ok = (status == STATUS.NO_CONTENT
-                or status == STATUS.NOT_FOUND and missingConstitutesSuccess)
+              or status == STATUS.NOT_FOUND and missingConstitutesSuccess)
         return 0 if ok else status
 
-    untag_object_by_about = by_about(untag_object_by_id)
+    def untag_object_by_id(self, id, tag, missingConstitutesSuccess=True,
+                           inPref=False):
+        return self.untag_object(id, tag, False, True, inPref)
 
-    def get_tag_value_by_id(self, id, tag, inPref=False):
+    def untag_object_by_about(self, about, tag, missingConstitutesSuccess=True,
+                              inPref=False):
+        return self.untag_object(about, tag, True, True, inPref)
+
+
+    def get_tag_value(self, spec, tag, byAbout, inPref=False):
         """Gets the value of a tag on an object identified by the
-           object's ID.
+           object's ID or about value..
+
+           spec is the id or about tag for the object, and with
+           with byAbout being true if it is an about tag.
 
            Returns  returns a 2-tuple, in which the first component
            is the status, and the second is either the tag value,
            if the return stats is STATUS.OK, or None otherwise.
         """
+        path = u'about' if byAbout else u'objects'
         fullTag = self.abs_tag_path(tag, inPref=inPref)
-        objTag = u'/objects/%s%s' % (id, fullTag)
+        objTag = u'/%s/%s%s' % (path, spec, fullTag)
         status, (value, value_type) = self._get_tag_value(objTag)
-        if status == STATUS.OK:
-            if value_type is None:
-                # A primitive Python value.
-                return status, value
-            else:
-                raise status(value, value_type)
-        else:
-            return status, None
+        return status, (value if status == STATUS.OK else None)
 
-    get_tag_value_by_about = by_about(get_tag_value_by_id)
+    def get_tag_value_by_id(self, id, tag, inPref=False):
+        return self.get_tag_value(id, tag, False, inPref)
+    
+    def get_tag_value_by_about(self, about, tag, inPref=False):
+        return self.get_tag_value(about, tag, True, inPref)
 
     def get_tag_values_by_id(self, id, tags):
         return [self.get_tag_value_by_id(id, tag) for tag in tags]
@@ -611,12 +632,13 @@ class FluidDB:
     def get_tag_values_by_about(self, about, tags):
         return [self.get_tag_value_by_about(about, tag) for tag in tags]
 
-    def get_object_tags_by_id(self, id):
+    def get_object_tags(self, spec, byAbout):
         """Gets the tags on an tag identified by the object's ID.
 
            Returns list of tags.
         """
-        obj = u'/objects/%s' % id
+        path = u'about' if byAbout else u'objects'
+        obj = u'/%s/%s' % (path, spec)
         status, (value, value_type) = self._get_tag_value(obj)
         if status == STATUS.OK:
             result = json.loads(value)
@@ -624,7 +646,11 @@ class FluidDB:
         else:
             raise ObjectNotFoundError(u'Couldn\'t find object %s' % obj)
 
-    get_object_tags_by_about = by_about(get_tag_value_by_id)
+    def get_object_tags_by_id(self, id):
+        return self.get_object_tags(id, False)
+
+    def get_object_tags_by_about(self, about):
+        return self.get_object_tags(about, True)
 
     def query(self, query):
         """Runs the query to get the IDs of objects satisfying the query.
