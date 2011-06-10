@@ -271,6 +271,8 @@
 #                      also uses non-ASCII, non-latin-1 tag names
 #                      and values as a test of unicode handling.
 #
+# 2011/06/09 v2.13     Added a test of the values API (which doesn't
+#                      seem to like unicode tag names.
 
 
 

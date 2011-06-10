@@ -6,7 +6,7 @@
 #               in the AUTHOR
 # Licence terms in LICENCE.
 
-__version__ = u'2.12'
+__version__ = u'2.13'
 VERSION = __version__
 
 import codecs
@@ -85,6 +85,7 @@ class STATUS:
     INTERNAL_SERVER_ERROR = 500
     NOT_FOUND = 404
     UNAUTHORIZED = 401
+    BAD_REQUEST= 400
 
 
 FLUIDDB_PATH = u'http://fluiddb.fluidinfo.com'
@@ -291,7 +292,6 @@ class FluidDB:
                                        format_param(kw[k])) for k in kw)
 
             url = '%s?%s' % (url, kwds)
-            
         return url.decode('UTF-8')
 
     def set_connection_from_global(self):
@@ -333,9 +333,10 @@ class FluidDB:
             for k in headers:
                 if not k == u'Authorization':
                     print u'  %s=%s' % (k, headers[k])
+        body8 = body.encode('UTF-8') if type(body) == unicode else body
 
         http = _get_http(self.timeout)
-        response, content = http.request(url, method, body, headers)
+        response, content = http.request(url, method, body8, headers)
         status = response.status
         if response[u'content-type'].startswith(u'application/json'):
             result = json.loads(content)
@@ -874,6 +875,8 @@ def format_val(s):
             return u'"%s"' % s
     elif type(s) == bool:
         return unicode(s).lower()
+    elif s is None:
+        return u'null'
     else:
         return unicode(s)
 

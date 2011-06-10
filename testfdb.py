@@ -66,6 +66,35 @@ class TestFluidDB(unittest.TestCase):
         o = db.untag_object_by_about(u'αβγδε', u'ζηθικ')
         o = db.untag_object_by_about(u'αβγδε', u'λμνξο')
 
+    def testValuesAPISetGet(self):
+        db = FluidDB()
+        user = db.credentials.username
+        pairs = {
+#            u'αβγδε': u'αβγδε',
+#            u'ζηθικ': 1,
+#            u'φχψω': 2.5,
+#            u'λμνξο': True,
+#            u'πρστυ': None,
+            u'testrating': u'αβγδε',
+            u'testrating2': 1,
+            u'testrating3': 2.5,
+            u'testrating4': True,
+            u'testrating5': None,
+        }
+        tagsToSet = {}
+        for tag in pairs:
+            db.tag_object_by_about(u'ΔΑΔΓΑΔ', tag, None)   # make sure 
+                                                           # tag exists
+            tagsToSet[db.abs_tag_path(tag)[1:]] = pairs[tag]
+
+        query = u'fluiddb/about = "ΔΑΔΓΑΔ"'
+        tag_by_query(db, query, tagsToSet)
+        objects = get_values(db, query, tagsToSet)
+        self.assertEqual(len(objects), 1)
+        o = objects[0]
+        for key in tagsToSet:
+            self.assertEqual(o.__dict__[key], tagsToSet[key])
+            db.delete_abstract_tag(u'/' + tag)
 
     def testSetTagByID(self):
         db = self.db
