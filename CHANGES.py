@@ -260,6 +260,8 @@
 #
 # 2011/06/09 v2.09     Can now use ls -P to list default permissions
 #                      (also known as /policies).
+#
+# 2011/06/09 v2.10     Fixed su command, which got broken by the optparse fix.
 
 
 

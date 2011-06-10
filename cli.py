@@ -504,7 +504,7 @@ def execute_command_line(action, args, options, parser):
         ls.execute_perms_command(objs, args, options)
     elif action in ('pwd', 'pwn', 'whoami'):
         execute_whoami_command(db)
-    elif action == 's':
+    elif action == 'su':
         execute_su_command(db, args)
     elif action in ['get', 'put', 'post', 'delete']:
         execute_http_request(action, args, db, options)
