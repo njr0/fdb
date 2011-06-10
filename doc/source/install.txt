@@ -1,4 +1,4 @@
-Installation and Configuration
+nstallation and Configuration
 ==============================
 
 **IMPORTANT CHANGE** From version 2.00 onwards, Fluidinfo
@@ -8,8 +8,8 @@ Download
 --------
 
 fdb is available from Github at https://github.com/njr0/fdb (use the
-download button).   Place fluiddb somewhere on your python path
-(environment variable ``PYTHONPATH``).
+download button).   The main program is ``fdb.py`` in the top
+level folder and the ``fdb`` script, which simply executes ``fdb.py``.
 
 
 Dependencies
@@ -112,7 +112,12 @@ Tests
 
 The library includes a set of tests.   If you have valid credentials,
 and everything is OK, these should run successfully if you just execute
-the file fdb.py.   
+the file testfdb.py or say
+::
+
+    python fdb.py test
+
+
 
 See :ref:`fdbtest`.
 
