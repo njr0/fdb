@@ -283,4 +283,8 @@
 #                      potentially problematical about tags.
 #                      Improved the readability of the error message
 #                      printed when fdb fails to find user credentials.
+#
+# 2011/06/09 v2.15     Added -2 flag to force high verbosity on tests
+#                      (to stop me leaving it set high, as I did in 2.14)
+
 

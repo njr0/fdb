@@ -434,6 +434,9 @@ def parse_args(args=None):
     general.add_option('-n', '--ns', action='store_true',
                        default=False,
             help='don\'t list namespace; just name of namespace.')
+    general.add_option('-2', '--hightestverbosity', action='store_true',
+                       default=False,
+            help='don\'t list namespace; just name of namespace.')
     parser.add_option_group(general)
 
     other = OptionGroup(parser, 'Other flags')
