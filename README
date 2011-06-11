@@ -80,7 +80,7 @@ TESTS
 
 The library includes a set of tests.   If you have valid credentials,
 and everything is OK, these should run successfully if you just execute
-the file fdb.   For example, at the time of writing this README file
+the file fdb.py.   For example, at the time of writing this README file
 (version 2.03 of the fdb), I get this:
 
 $ fdb test

@@ -53,7 +53,7 @@ def go():
         for c in cases.values():
             s = unittest.TestLoader().loadTestsFromTestCase(c)
             suite.addTest(s)
-        unittest.TextTestRunner(verbosity=1).run(suite)
+        unittest.TextTestRunner(verbosity=2).run(suite)
     else:
         execute_command_line(action, args, options, parser)
 

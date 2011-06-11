@@ -273,9 +273,14 @@
 #
 # 2011/06/09 v2.13     Added a test of the values API (which doesn't
 #                      seem to like unicode tag names.
-
-
-
-
-
+#
+# 2011/06/09 v2.14     Fixed some problems I introduced in 2.12
+#                      that prevented things working correctly with
+#                      about tags that contained slashes (like URLs).
+#                      This is because the about tag wasn't being
+#                      encoded properly when used with /about.
+#                      Added a couple of tests for that and related,
+#                      potentially problematical about tags.
+#                      Improved the readability of the error message
+#                      printed when fdb fails to find user credentials.
 

@@ -111,9 +111,15 @@ class TestFluidDB(unittest.TestCase):
         db = self.db
         user = db.credentials.username
         o = db.delete_abstract_tag('testrating')
-        o = db.tag_object_by_about('DADGAD', '/%s/testrating' % user, 'five')
+        o = db.tag_object_by_about('http://dadgad.com',
+                                   '/%s/testrating' % user, 'five')
+        o = db.tag_object_by_about('DAD +GAD',
+                                   '/%s/testrating' % user, 'five')
         self.assertEqual(o, 0)
-        _status, v = db.get_tag_value_by_about('DADGAD', 'testrating')
+        _status, v = db.get_tag_value_by_about('http://dadgad.com',
+                                                'testrating')
+        _status, v = db.get_tag_value_by_about('DAD +GAD', 'testrating')
+                                                
         self.assertEqual(v, 'five')
 
     def testDeleteNonExistentTag(self):

@@ -6,7 +6,7 @@
 #               in the AUTHOR
 # Licence terms in LICENCE.
 
-__version__ = u'2.13'
+__version__ = u'2.14'
 VERSION = __version__
 
 import codecs
@@ -121,16 +121,32 @@ sys.stderr = UnicodeOut(sys.stderr)
 
 def quote_u_u(s):
     """Quote a unicode string s using %-encoding.
-       Returns unicode
+
+       If s is a list, each part is quoted then return, joined by slashes.
+
+       Returns unicode.
     """
-    return urllib.quote(s.encode('UTF-8')).decode('UTF-8')
+    if type(s) in (list, tuple):
+        u8parts = (part.encode('UTF-8') for part in s)
+        return u'/'.join(urllib.quote(p, safe='').decode('UTF-8')
+                         for p in u8parts)
+    else:
+        return urllib.quote(s.encode('UTF-8')).decode('UTF-8')
     
 
 def quote_u_8(s):
     """Quote a unicode string s using %-encoding.
+
+       If s is a list, each part is quoted then return, joined by slashes.
+
        Returns UTF-8.
     """
-    return urllib.quote(s.encode('UTF-8')).decode('UTF-8')
+    if type(s) in (list, tuple):
+        u8parts = (part.encode('UTF-8') for part in s)
+        return '/'.join(urllib.quote(p, safe='') for p in u8parts)
+                        
+    else:
+        return urllib.quote(s.encode('UTF-8'))
 
 
 def urlencode_hash_u_8(hash):
@@ -235,8 +251,9 @@ class Credentials:
                     raise ProblemReadingCredentialsFileError(u'Failed to read'
                             ' credentials from %s.' % toStr(filename))
             else:
-                raise CredentialsFileNotFoundError(u'Couldn\'t find or '
-                            'read credentials from %s.' % toStr(filename))
+                raise CredentialsFileNotFoundError(u'\nCouldn\'t find or '
+                          'read credentials from the expected location:\n%s'
+                           % toStr(filename))
 
         self.id = id
 
@@ -541,6 +558,14 @@ class FluidDB:
         (status, o) = self.call('DELETE', fullTag)
         return 0 if status == STATUS.NO_CONTENT else status
 
+    def path_parts(self, byAbout, spec, tag=None, inPref=False):
+        path = u'about' if byAbout else u'objects'
+        base = [u'', path, spec]
+        if tag:
+            return base + self.abs_tag_path(tag, inPref=inPref).split(u'/')[1:]
+        else:
+            return base
+
     def tag_object(self, spec, tag, byAbout, value=None, value_type=None,
                    createAbstractTagIfNeeded=True, inPref=False):
                          
@@ -550,10 +575,8 @@ class FluidDB:
            tag given doesn't exist, it is created unless
            createAbstractTagIfNeeded is set to False.
         """
-        path = u'about' if byAbout else u'objects'
-        fullTag = self.abs_tag_path(tag, inPref=inPref)
-        objTag = u'/%s/%s%s' % (path, spec, fullTag)
-        (status, o) = self._set_tag_value(objTag, value, value_type)
+        objTagParts = self.path_parts(byAbout, spec, tag, inPref)
+        (status, o) = self._set_tag_value(objTagParts, value, value_type)
         if status == STATUS.NOT_FOUND and createAbstractTagIfNeeded:
             o = self.create_abstract_tag(tag)
             if type(o) == types.IntType:       # error code
@@ -587,10 +610,8 @@ class FluidDB:
 
            Returns 0 for success, non-zero error code otherwise.
         """
-        path = u'about' if byAbout else u'objects'
-        fullTag = self.abs_tag_path(tag, inPref=inPref)
-        objTag = u'/%s/%s%s' % (path, spec, fullTag)
-        (status, o) = self.call('DELETE', objTag)
+        objTagParts = self.path_parts(byAbout, spec, tag, inPref)
+        (status, o) = self.call('DELETE', objTagParts)
         ok = (status == STATUS.NO_CONTENT
               or status == STATUS.NOT_FOUND and missingConstitutesSuccess)
         return 0 if ok else status
@@ -615,10 +636,8 @@ class FluidDB:
            is the status, and the second is either the tag value,
            if the return stats is STATUS.OK, or None otherwise.
         """
-        path = u'about' if byAbout else u'objects'
-        fullTag = self.abs_tag_path(tag, inPref=inPref)
-        objTag = u'/%s/%s%s' % (path, spec, fullTag)
-        status, (value, value_type) = self._get_tag_value(objTag)
+        objTagParts = self.path_parts(byAbout, spec, tag, inPref)
+        status, (value, value_type) = self._get_tag_value(objTagParts)
         return status, (value if status == STATUS.OK else None)
 
     def get_tag_value_by_id(self, id, tag, inPref=False):
@@ -638,9 +657,8 @@ class FluidDB:
 
            Returns list of tags.
         """
-        path = u'about' if byAbout else u'objects'
-        obj = u'/%s/%s' % (path, spec)
-        status, (value, value_type) = self._get_tag_value(obj)
+        objParts = self.path_parts(byAbout, spec)
+        status, (value, value_type) = self._get_tag_value(objParts)
         if status == STATUS.OK:
             result = json.loads(value)
             return result[u'tagPaths']
