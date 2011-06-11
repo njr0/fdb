@@ -68,9 +68,12 @@ in the format
 username
 password
 
-On Unix, the default location for this is ~/.fluidDBcredentials,
-and on Windows the default file is fluidDBcredentials.ini in your
-home folder.
+On Unix-like operating systems (including Mac OS X), the default location
+for this is ``~/.fluidDBcredentials``.
+
+On windows, the lcoation of the credentials file is specified
+by the environment variable ``FDB_CREDENTIALS_FILE``; if that is not
+set, the fdb looks for ``c:\fdb\credentials.txt``.
 
 You can also optionally add a line, after password, saying either
 

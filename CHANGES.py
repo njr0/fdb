@@ -286,5 +286,18 @@
 #
 # 2011/06/09 v2.15     Added -2 flag to force high verbosity on tests
 #                      (to stop me leaving it set high, as I did in 2.14)
+#
+# 2011/06/11 v2.16     Made a set of changes to make things run better
+#                      as a web service.
+#                      Changed the way things work on windows to
+#                      remove the need for win32com
+#                      As a result, it now looks for the credentials file
+#                      in a location specified by the environment variable
+#                      FDB_CREDENTIALS_FILE, or c:\fdb\credentials.txt if
+#                      the variable is not defined.
+#                      Removed use of codecs in win32, since it doesn't
+#                      seem to work (so perhaps not unicode user names
+#                      or passwords on windows).
+#
 
 

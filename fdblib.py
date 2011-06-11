@@ -6,7 +6,7 @@
 #               in the AUTHOR
 # Licence terms in LICENCE.
 
-__version__ = u'2.15'
+__version__ = u'2.16'
 VERSION = __version__
 
 import codecs
@@ -19,7 +19,10 @@ from functools import wraps
 from httplib2 import Http
 
 if sys.version_info < (2, 6):
-    import simplejson as json
+    try:
+        import simplejson as json
+    except ImportError:
+        from django.utils import simplejson as json
 else:
     import json
 
@@ -94,6 +97,10 @@ UNIX_CREDENTIALS_FILE = u'.fluidDBcredentials'
 WINDOWS_CREDENTIALS_FILE = u'fluidDBcredentials.ini'
 UNIX_USER_CREDENTIALS_FILE = u'.fluidDBcredentials.%s'
 WINDOWS_USER_CREDENTIALS_FILE = u'fluidDBcredentials-%s.ini'
+
+CRED_FILE_VAR = 'FDB_CREDENTIALS_FILE'
+WIN_CRED_FILE = 'c:\\fdb\\credentials.txt'
+
 HTTP_TIMEOUT = 300.123456       # unlikey the user will choose this
 PRIMITIVE_CONTENT_TYPE = u'application/vnd.fluiddb.value+json'
 
@@ -108,6 +115,16 @@ IDS_SAND = {u'DADGAD': DADGAD_ID}
 DEFAULT_ENCODING = sys.getfilesystemencoding()
 
 
+class SaveOut:
+    def __init__(self):
+        self.buffer = []
+
+    def write(self, msg):
+        self.buffer.append(msg)
+
+    def clear(self):
+        self.buffer = []
+
 class UnicodeOut:
     def __init__(self, std):
         self.std = std
@@ -115,9 +132,6 @@ class UnicodeOut:
     def write(self, msg):
         self.std.write((msg.encode('UTF-8') if type(msg) == unicode else msg))
             
-sys.stdout = UnicodeOut(sys.stdout)
-sys.stderr = UnicodeOut(sys.stderr)
-
 
 def quote_u_u(s):
     """Quote a unicode string s using %-encoding.
@@ -231,7 +245,10 @@ class Credentials:
                 filename = get_credentials_file(username=username)
             if os.path.exists(filename):
                 try:
-                    f = codecs.open(filename, 'UTF-8')
+                    if os.name == 'posix':
+                        f = codecs.open(filename, 'UTF-8')
+                    else:
+                        f = open(filename)
                     lines = f.readlines()
                     self.username = lines[0].strip().decode('UTF-8')
                     self.password = lines[1].strip().decode('UTF-8')
@@ -345,11 +362,11 @@ class FluidDB:
         url = self._get_url(self.host, path, hash, kw)
 
         if self.debug:
-            print(u'\nmethod: %r\nurl: %r\nbody: %s\nheaders:' %
+            Print(u'\nmethod: %r\nurl: %r\nbody: %s\nheaders:' %
                    (method, url, body))
             for k in headers:
                 if not k == u'Authorization':
-                    print u'  %s=%s' % (k, headers[k])
+                    Print(u'  %s=%s' % (k, headers[k]))
         body8 = body.encode('UTF-8') if type(body) == unicode else body
 
         http = _get_http(self.timeout)
@@ -360,12 +377,12 @@ class FluidDB:
         else:
             result = content
         if self.debug:
-            print u'status: %d; content: %s' % (status, toStr(result))
+            Print(u'status: %d; content: %s' % (status, toStr(result)))
             if status >= 400:
                 for header in response:
                     if header.lower().startswith(u'x-fluiddb-'):
-                        print u'\t%s=%s' % (header.decode('UTF-8'),
-                                            response[header].decode('UTF-8'))
+                        Print(u'\t%s=%s' % (header.decode('UTF-8'),
+                                            response[header].decode('UTF-8')))
 
         return status, result
 
@@ -374,7 +391,7 @@ class FluidDB:
         url = self._get_url(self.host, path, hash=None, kw=None)
         http = _get_http(self.timeout)
         if self.debug:
-            print u'\nShow URL:', url
+            Print(u'\nShow URL: %s' % url)
         response, content = http.request(url, u'GET', None, headers)
         content_type = response[u'content-type']
         if content_type == PRIMITIVE_CONTENT_TYPE:
@@ -393,8 +410,8 @@ class FluidDB:
         url = self._get_url(self.host, path, hash=None, kw=None)
         http = _get_http(self.timeout)
         if self.debug:
-            print u'\nTag URL:', url
-            print u'Value:', value
+            Print(u'\nTag URL: %s' % url)
+            Print(u'Value: %s' % value)
         response, content = http.request(url, u'PUT', value.encode('UTF-8'),
                                          headers)
         return response.status, content
@@ -455,8 +472,8 @@ class FluidDB:
         if status == STATUS.CREATED:
             id = result[u'id']
             if verbose:
-                print u'Created namespace /%s/%s with ID %s' % (parent,
-                                                                subNS, id)
+                Print(u'Created namespace /%s/%s with ID %s' % (parent,
+                                                                subNS, id))
 #            return self.encode(id)
             return id
         elif status == STATUS.NOT_FOUND:    # parent namespace doesn't exist
@@ -472,8 +489,8 @@ class FluidDB:
                                            u'/%s not writable' % (user, user))
         else:
             if verbose:
-                print u'Failed to create namespace %s (%d)' % (fullPath,
-                                                                status)
+                Print(u'Failed to create namespace %s (%d)' % (fullPath,
+                                                                status))
             return status
 
     def delete_namespace(self, path, recurse=False, force=False,
@@ -492,9 +509,9 @@ class FluidDB:
         status, result = self.call('DELETE', fullPath)
         if verbose:
             if status == STATUS.NO_CONTENT:
-                print u'Removed namespace %s' % absPath
+                Print(u'Removed namespace %s' % absPath)
             else:
-                print u'Failed to remove namespace %s (%d)' % (absPath, status)
+                Print(u'Failed to remove namespace %s (%d)' % (absPath, status))
         return status
 
     def describe_namespace(self, path):
@@ -814,11 +831,8 @@ def get_credentials_file(unixFile=None, windowsFile=None, username=None):
                 else UNIX_CREDENTIALS_FILE)
         return os.path.join(homeDir, file)
     elif os.name:
-        from win32com.shell import shellcon, shell
-        homeDir = shell.SHGetFolderPath(0, shellcon.CSIDL_APPDATA, 0, 0)
-        file = ((WINDOWS_USER_CREDENTIALS_FILE % username) if username
-                else WINDOWS_CREDENTIALS_FILE)
-        return os.path.join(homeDir, file)
+        e = os.environ
+        return e[CRED_FILE_VAR] if CRED_FILE_VAR in e else WIN_CRED_FILE
     else:
         return None
 
@@ -857,7 +871,7 @@ def choose_host():
     if u'options' in globals():
         host = options.hostname
         if options.verbose:
-            print u"Chosen %s as host" % host
+            Print(u"Chosen %s as host" % host)
         return host
     else:
         return FLUIDDB_PATH
@@ -1021,4 +1035,12 @@ def version():
 
 
 def uprint(s):
-    print s.encode('UTF-8') if type(s) == unicode else s
+    Print(s.encode('UTF-8') if type(s) == unicode else s)
+
+out = SaveOut()
+def Print(s):
+    if hasattr(Print, 'save'):
+        out.write(s)
+    else:
+        print s
+

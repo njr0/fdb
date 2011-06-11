@@ -36,6 +36,9 @@
 
 from testfdb import *
 
+sys.stdout = UnicodeOut(sys.stdout)
+sys.stderr = UnicodeOut(sys.stderr)
+
 def go():
     action, args, options, parser = parse_args()
 

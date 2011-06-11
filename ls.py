@@ -3,9 +3,13 @@ import sys
 import types
 import fdblib
 import cli
+from fdblib import Print
 
 if sys.version_info < (2, 6):
-    import simplejson as json
+    try:
+        import simplejson as json
+    except ImportError:
+        from django.utils import simplejson as json
 else:
     import json
 
@@ -372,23 +376,23 @@ class ExtendedFluidDB(fdblib.FluidDB):
         if items:
             fmt = string_format(max([len(item) for item in items]))
         if recurse:
-            print u'\n%s:' % ns
+            Print(u'\n%s:' % ns)
         if long_ or longer:
             res = []
             for item in items:
                 r = self.full_perms(ns + u'/' + fmt % item, longer)
                 res.append(r)
                 if prnt:
-                    print r
+                    Print(r)
             result = u'\n'.join(res)
         elif columns == False:
             result = u'\n'.join(items)
             if prnt:
-                print result
+                Print(result)
         else:
             result = to_string_grid(items)
             if prnt:
-                print result
+                Print(result)
         if recurse:
             others = u'\n'.join([self.list_sorted_ns(u'%s/%s' % (ns, space),
                                                      long_, columns, recurse,
@@ -567,7 +571,7 @@ class ExtendedFluidDB(fdblib.FluidDB):
         body = json.dumps({u'policy': policy, u'exceptions': exceptions})
         path = u'/permissions/%s/%s' % (perm.path, path)
         if self.debug:
-            print path, body, action
+            Print(path, body, action)
         status, content = self.call(u'PUT', path, body, action=action)
         return 0 if status == fdblib.STATUS.NO_CONTENT else status
 
@@ -579,20 +583,19 @@ def write_status(writes):
          return u'-' if all(w == u'-' for w in writes) else u'/'
 
 
-def execute_ls_command(objs, tags, options):
-    credentials = Credentials(options.user[0]) if options.user else None
+def execute_ls_command(objs, tags, options, credentials):
     db = ExtendedFluidDB(host=options.hostname, credentials=credentials,
                          debug=options.debug,
                          unixStylePaths=fdblib.path_style(options))
     long_ = options.long or options.group
     if options.policy:
         if len(tags) > 0:
-            print u'Form: ls -P'
+            Print(u'Form: ls -P')
         else:
-            print unicode(FluidinfoPerms(db, u'/' + db.credentials.username,
-                                   isTag=False, isPolicy=True))
-            print unicode(FluidinfoPerms(db, u'/' + db.credentials.username,
-                                   isTag=True, isPolicy=True))
+            Print(unicode(FluidinfoPerms(db, u'/' + db.credentials.username,
+                                   isTag=False, isPolicy=True)))
+            Print(unicode(FluidinfoPerms(db, u'/' + db.credentials.username,
+                                   isTag=True, isPolicy=True)))
         return
     if len(tags) == 0:
         tags = [(u'/' if db.unixStyle else u'') + db.credentials.username]
@@ -605,7 +608,7 @@ def execute_ls_command(objs, tags, options):
                                              options.longer, options.group)
                 else:
                     nsResult = fulltag
-                print nsResult
+                Print(nsResult)
             else:
                 nsResult = u'Not Found'
         else:
@@ -615,60 +618,58 @@ def execute_ls_command(objs, tags, options):
         tagExists = db.tag_exists(fulltag)
         if nsResult == u'Error status 404':
             if not tagExists:
-                print u'%s not found' % fulltag
+                Print(u'%s not found' % fulltag)
         if tagExists:
             if long_ or options.longer:
-                print db.full_perms(fulltag[1:], options.longer, options.group)
+                Print(db.full_perms(fulltag[1:], options.longer, options.group))
             else:
-                print tag
+                Print(tag)
 
 
-def execute_chmod_command(objs, args, options):
+def execute_chmod_command(objs, args, options, credentials):
     cli.warning('Not implemented yet.')
     return
-    credentials = Credentials(options.user[0]) if options.user else None
     db = ExtendedFluidDB(host=options.hostname, credentials=credentials,
                          debug=options.debug,
                          unixStylePaths=fdblib.path_style(options))
     if len(args) < 2:
-        print u'Form: chmod [perms-spec] list-of-tags-and-namespaces'
+        Print(u'Form: chmod [perms-spec] list-of-tags-and-namespaces')
         return
     spec = args[0]
     if not all(u'0' <= p<= u'7' for p in spec) or len(spec) != 3:
-        print (u'Permissions specifier must have for ddd with each d between '
-               u'0 and 7')
+        Print((u'Permissions specifier must have for ddd with each d between '
+               u'0 and 7'))
     new_perms = UnixPerms(spec, db.credentials.username)
     fullpaths = (db.abs_tag_path(t, inPref=True) for t in args[1:])
-    print unicode(new_perms)
-    print 'READ:', unicode(new_perms.read)
-    print 'WRITE:', unicode(new_perms.write)
-    print 'CONTROL:', unicode(new_perms.control)
+    Print(unicode(new_perms))
+    Print(u'READ: %s' %  unicode(new_perms.read))
+    Print(u'WRITE: %s' % unicode(new_perms.write))
+    Print(u'CONTROL: %s' % unicode(new_perms.control))
     new_perms.check_owner_control_ok()
     for path in fullpaths:
         done = False
         if db.tag_exists(path):
             inPerms = FluidinfoPerms(db, path, isTag=True)
-            print unicode(inPerms)
+            Print(unicode(inPerms))
             new_perms.isTag = True
 #            outPerms = new_perms.new_fi_tag_perms(inTagPerms)
             done = True
         if db.ns_exists(path):
             inPerms = FluidinfoPerms(db, path, isTag=False)
-            print unicode(inPerms)
+            Print(unicode(inPerms))
             new_perms.isTag = False
 #            outPerms = new_perms.new_fi_ns_perms(inTagPerms)
             done = True
         if not done:
-            print 'No tag or namespace %s found' % db.abs_tag_path(path,
-                                                                  outPref=True)
+            Print('No tag or namespace %s found' % db.abs_tag_path(path,
+                                                                 outPref=True))
 
-def execute_perms_command(objs, args, options):
-    credentials = Credentials(options.user[0]) if options.user else None
+def execute_perms_command(objs, args, options, credentials):
     db = ExtendedFluidDB(host=options.hostname, credentials=credentials,
                          debug=options.debug,
                          unixStylePaths=fdblib.path_style(options))
     if len(args) < 2:
-        print u'Form: perms SPEC list of tags and namespaces'
+        Print(u'Form: perms SPEC list of tags and namespaces')
         return
     spec = args[0]
     assert spec in (u'private', u'default', u'group', u'group-write',
@@ -677,8 +678,8 @@ def execute_perms_command(objs, args, options):
     if isGroup:
         group = args[1].split(u'+')
         if len(args) < 3:
-            print (u'Group form: perms %s list+of+group+members list of tags '
-                   u'and namespaces' % spec)
+            Print((u'Group form: perms %s list+of+group+members list of tags '
+                   u'and namespaces' % spec))
     fullpaths = (db.abs_tag_path(t, inPref=True) for t in args[1 + isGroup:])
     for path in fullpaths:
         done = False
@@ -708,5 +709,5 @@ def execute_perms_command(objs, args, options):
                 inPerms.update_fluidinfo(db)
                 done = True
         if not done:
-            print 'No tag or namespace %s found' % db.abs_tag_path(path,
-                                                                  outPref=True)
+            Print('No tag or namespace %s found' % db.abs_tag_path(path,
+                                                                outPref=True))

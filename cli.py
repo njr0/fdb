@@ -18,6 +18,7 @@ from fdblib import (
     get_credentials_file,
     get_typed_tag_value,
     path_style,
+    Print,
     toStr,
     uprint,
     version,
@@ -165,7 +166,7 @@ def execute_tag_command(objs, db, tags, options):
                                   inPref=True)
             if o == 0:
                 if options.verbose:
-                    print(u'Tagged object %s with %s'
+                    Print(u'Tagged object %s with %s'
                             % (description,
                                formatted_tag_value(tag.name, tag.value)))
             else:
@@ -185,7 +186,7 @@ def execute_untag_command(objs, db, tags, options):
             o = actions[obj.mode](obj.specifier, tag, inPref=True)
             if o == 0:
                 if options.verbose:
-                    print('Removed tag %s from object %s\n'
+                    Print('Removed tag %s from object %s\n'
                           % (tag, description))
             else:
                 warning(u'Failed to remove tag %s from object %s'
@@ -200,7 +201,7 @@ def execute_show_command(objs, db, tags, options):
     }
     for obj in objs:
         description = describe_by_mode(obj.specifier, obj.mode)
-        print u'Object %s:' % description
+        Print(u'Object %s:' % description)
 
         for tag in tags:
             fulltag = db.abs_tag_path(tag, inPref=True)
@@ -218,18 +219,18 @@ def execute_show_command(objs, db, tags, options):
                 status, v = actions[obj.mode](obj.specifier, tag, inPref=True)
 
             if status == STATUS.OK:
-                print u'  %s' % formatted_tag_value(outtag, v)
+                Print(u'  %s' % formatted_tag_value(outtag, v))
             elif status == STATUS.NOT_FOUND:
-                print u'  %s' % cli_bracket(u'tag %s not present' % outtag)
+                Print(u'  %s' % cli_bracket(u'tag %s not present' % outtag))
             else:
-                print cli_bracket(u'error code %s getting tag %s'
-                                  % (error_code(status), outtag))
+                Print(cli_bracket(u'error code %s getting tag %s'
+                                  % (error_code(status), outtag)))
 
 
 def execute_tags_command(objs, db, options):
     for obj in objs:
         description = describe_by_mode(obj.specifier, obj.mode)
-        print u'Object %s:' % description
+        Print(u'Object %s:' % description)
         id = (db.create_object(obj.specifier).id if obj.mode == u'about'
               else obj.specifier)
         for tag in db.get_object_tags_by_id(id):
@@ -238,16 +239,16 @@ def execute_tags_command(objs, db, options):
             status, v = db.get_tag_value_by_id(id, fulltag)
 
             if status == STATUS.OK:
-                print u'  %s' % formatted_tag_value(outtag, v)
+                Print(u'  %s' % formatted_tag_value(outtag, v))
             elif status == STATUS.NOT_FOUND:
-                print u'  %s' % cli_bracket(u'tag %s not present' % outtag)
+                Print(u'  %s' % cli_bracket(u'tag %s not present' % outtag))
             else:
-                print cli_bracket(u'error code %s getting tag %s'
-                                  % (error_code(status), uttag))
+                Print(cli_bracket(u'error code %s getting tag %s'
+                                  % (error_code(status), uttag)))
 
 
 def execute_whoami_command(db):
-    print db.credentials.username
+    Print(db.credentials.username)
 
 
 def execute_su_command(db, args):
@@ -258,7 +259,7 @@ def execute_su_command(db, args):
     username = db.credentials.username
     file = args[0].decode(DEFAULT_ENCODING)
     extra = u'' if args[0] == username else (u' (file %s)' % file)
-    print u'Credentials set to user %s%s.' % (username, extra)
+    Print(u'Credentials set to user %s%s.' % (username, extra))
 
 
 def execute_http_request(action, args, db, options):
@@ -283,8 +284,8 @@ def execute_http_request(action, args, db, options):
     for pair in tags:
         hash[pair.name] = pair.value
     status, result = db.call(method, uri, body, hash)
-    print u'Status: %d' % status
-    print u'Result: %s' % toStr(result)
+    Print(u'Status: %d' % status)
+    Print(u'Result: %s' % toStr(result))
 
 
 def describe_by_mode(specifier, mode):
@@ -330,17 +331,18 @@ def form_tag_value_pairs(tags):
 
 
 def warning(msg):
-    sys.stderr.write(u'%s\n' % msg)
+#    sys.stderr.write(u'%s\n' % msg)
+    Print(u'%s\n' % msg)
 
 
 def fail(msg):
     warning(msg)
-    sys.exit(1)
+    raise Exception, msg
 
 
 def nothing_to_do():
-    print u'Nothing to do.'
-    sys.exit(0)
+    Print(u'Nothing to do.')
+    raise Exception, msg
 
 
 def cli_bracket(s):
@@ -352,7 +354,7 @@ def get_ids_or_fail(query, db):
     if type(ids) == types.IntType:
         fail(u'Query failed')
     else:   # list of ids
-        print u'%s matched' % plural(len(ids), u'object')
+        Print(u'%s matched' % plural(len(ids), u'object'))
         return ids
 
 
@@ -384,10 +386,12 @@ def plural(n, s, pl=None, str=False, justTheWord=False):
 def parse_args(args=None):
     if args is None:
         args = [a.decode(DEFAULT_ENCODING) for a in sys.argv[1:]]
-    if Credentials().unixStyle:
-        usage = USAGE_FI if '-F' in args else USAGE
+        if Credentials().unixStyle:
+            usage = USAGE_FI if '-F' in args else USAGE
+        else:
+            usage = USAGE if '-U' in args else USAGE_FI
     else:
-        usage = USAGE if '-U' in args else USAGE_FI
+        usage = USAGE_FI
     parser = OptionParser(usage=usage)
     general = OptionGroup(parser, 'General options')
     general.add_option('-a', '--about', action='append', default=[],
@@ -459,35 +463,61 @@ def parse_args(args=None):
     return action, args, options, parser
 
 
-def execute_command_line(action, args, options, parser):
+def execute_command_line(action, args, options, parser, user=None, pwd=None):
+    credentials = (Credentials(user or options.user[0], pwd)
+                   if (user or options.user) else None)
     if not action == 'ls':
-        credentials = Credentials(options.user[0]) if options.user else None
         db = FluidDB(host=options.hostname, credentials=credentials,
                      debug=options.debug, unixStylePaths=path_style(options))
     ids_from_queries = chain(*imap(lambda q: get_ids_or_fail(q, db),
         options.query))
     ids = chain(options.id, ids_from_queries)
 
+    command_list = [
+        'help',
+        'version',
+        'commands',
+        'tag',
+        'untag',
+        'show',
+        'tags',
+        'ls',
+        'perms',
+        'pwd',
+        'pwn',
+        'test',
+        'testcli',
+        'testdb',
+        'testapi',
+        'whoami',
+        'su',
+    ]
+
     objs = [O({'mode': 'about', 'specifier': a}) for a in options.about] + \
             [O({'mode': 'id', 'specifier': id}) for id in ids]
 
-    if options.version:
-        print 'fdb %s' % version()
+    if action == 'version' or options.version:
+        Print('fdb %s' % version())
         if action == 'version':
-            sys.exit(0)
+            return
+    
     if action == 'help':
-        print USAGE if db.unixStyle else USAGE_FI
-        sys.exit(0)
+        Print(USAGE if db.unixStyle else USAGE_FI)
+    elif action == 'commands':
+        Print(' '.join(command_list))
+    elif action not in command_list:
+        Print('Unrecognized command %s' % action)        
     elif (action.upper() not in HTTP_METHODS + ARGLESS_COMMANDS
           and not args):
-        parser.error('Too few arguments for action %s' % action)
+        Print('Too few arguments for action %s' % action)
     elif action == 'count':
-        print 'Total: %s' % (flags.Plural(len(objs), 'object'))
+        Print('Total: %s' % (flags.Plural(len(objs), 'object')))
     elif action == 'tags':
         execute_tags_command(objs, db, options)
     elif action in ('tag', 'untag', 'show'):
         if not (options.about or options.query or options.id):
-            parser.error('You must use -q, -a or -i with %s' % action)
+            Print('You must use -q, -a or -i with %s' % action)
+            return
         tags = args
         if len(tags) == 0 and action != 'count':
             nothing_to_do()
@@ -500,11 +530,11 @@ def execute_command_line(action, args, options, parser):
 
         command(objs, db, args, options)
     elif action == 'ls':
-        ls.execute_ls_command(objs, args, options)
+        ls.execute_ls_command(objs, args, options, credentials)
     elif action == 'chmod':
-        ls.execute_chmod_command(objs, args, options)
+        ls.execute_chmod_command(objs, args, options, credentials)
     elif action == 'perms':
-        ls.execute_perms_command(objs, args, options)
+        ls.execute_perms_command(objs, args, options, credentials)
     elif action in ('pwd', 'pwn', 'whoami'):
         execute_whoami_command(db)
     elif action == 'su':
@@ -512,4 +542,4 @@ def execute_command_line(action, args, options, parser):
     elif action in ['get', 'put', 'post', 'delete']:
         execute_http_request(action, args, db, options)
     else:
-        parser.error('Unrecognized command %s' % action)
+        Print('Unrecognized command %s' % action)

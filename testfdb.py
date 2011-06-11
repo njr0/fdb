@@ -11,10 +11,10 @@ from fdblib import *
 from cli import *
 
 class TestFluidDB(unittest.TestCase):
-    db = FluidDB()
-    user = db.credentials.username
 
     def setUp(self):
+        self.db = FluidDB()
+        self.user = self.db.credentials.username
         self.db.set_connection_from_global()
         self.db.set_debug_timeout(5.0)
         self.dadgadID = id('DADGAD', self.db.host)
@@ -67,7 +67,7 @@ class TestFluidDB(unittest.TestCase):
         o = db.untag_object_by_about(u'αβγδε', u'λμνξο')
 
     def testValuesAPISetGet(self):
-        db = FluidDB()
+        db = self.db
         user = db.credentials.username
         pairs = {
 #            u'αβγδε': u'αβγδε',
@@ -187,10 +187,10 @@ class TestFluidDB(unittest.TestCase):
 
 
 class TestFDBUtilityFunctions(unittest.TestCase):
-    db = FluidDB()
-    user = db.credentials.username
 
     def setUp(self):
+        self.db = FluidDB()
+        self.user = self.db.credentials.username
         self.db.set_connection_from_global()
         self.db.set_debug_timeout(5.0)
         self.dadgadID = id('DADGAD', self.db.host)
@@ -290,17 +290,6 @@ class TestFDBUtilityFunctions(unittest.TestCase):
             self.assertEqual((s, type(v)), (s, targetType))
 
 
-class SaveOut:
-    def __init__(self):
-        self.buffer = []
-
-    def write(self, msg):
-        self.buffer.append(msg)
-
-    def clear(self):
-        self.buffer = []
-
-
 def specify_DADGAD(mode, host):
     if mode == 'about':
         return ('-a', 'DADGAD')
@@ -313,10 +302,10 @@ def specify_DADGAD(mode, host):
 
 
 class TestCLI(unittest.TestCase):
-    db = FluidDB()
-    user = db.credentials.username
 
     def setUp(self):
+        self.db = FluidDB()
+        self.user = self.db.credentials.username
         self.db.set_connection_from_global()
         self.db.set_debug_timeout(5.0)
         self.dadgadID = id('DADGAD', self.db.host)
